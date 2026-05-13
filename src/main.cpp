@@ -10,3 +10,27 @@
 // is completed.
 //
 
+#include "platform/mac/MacWindow.h"
+#include <iostream>
+
+int main()
+{
+    vuron::MacWindow myWindow;
+
+    if (!myWindow.init())
+    {
+        std::cout << "Failed to initialize Vuron Window" << std::endl;
+        return -1;
+    }
+
+    std::cout << "Vuron Engine started" << std::endl;
+
+    // The main Game loop
+    // For now, we're just runnin git for a few seconds or until we stop it
+    while (true)
+    {
+        myWindow.update();
+    }
+
+    return 0;
+}
