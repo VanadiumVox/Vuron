@@ -26,7 +26,7 @@ int main()
     std::cout << "Vuron Engine started" << std::endl;
 
     // The main Game loop
-    // For now, we're just runnin git for a few seconds or until we stop it
+    // For now, we're just running it for a few seconds or until we stop it
     while (true)
     {
         myWindow.update();

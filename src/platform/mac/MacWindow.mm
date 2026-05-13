@@ -23,12 +23,25 @@ namespace vuron
         return false;
       }
 
+      // Initializing the global NSApp obj if it hasn't been already
+      [NSApplication sharedApplication];
+      // This just tells the OS that this is a regular "app"
+      [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+      // Window creation code
       // Set the window title as Vuron Enigne
       [window setTitle:@"Vuron Engine"];
       // Bring the window to the front of the screen when opened
       [window makeKeyAndOrderFront:nil];
       // Saving the handle for later use in update and close functions
       m_windowHandle = (void*)window;
+
+      // Brings the Vuron window to the front when we activate the engine
+      [NSApp activateIgnoringOtherApps:YES];
+      [window makeKeyAndOrderFront:nil];
+      // Optimization for raw connection to the screen
+      [window setHasShadow:YES];
+      [window setAcceptsMouseMovedEvents:YES];
 
       return true;
 
