@@ -12,6 +12,7 @@
 
 #include "platform/mac/MacWindow.h"
 #include <iostream>
+#include <chrono>
 
 int main()
 {
@@ -23,13 +24,33 @@ int main()
         return -1;
     }
 
+    // Capturing the start time
+    auto lastTime = std::chrono::high_resolution_clock::now();
+
     std::cout << "Vuron Engine started" << std::endl;
 
-    // The main Game loop
-    // For now, we're just running it for a few seconds or until we stop it
+    // Main Delta Time loop
     while (true)
     {
+        // Here, we calculate the delta time (don't ask)
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> elapsed = currentTime - lastTime;
+        float deltaTime = elapsed.count();
+        lastTime = currentTime;
+
+        // Over here we update the platform, with any other registered inputs
+        // like mouse clicks or resizes
         myWindow.update();
+
+        // ----TEMP----
+        // For testing, we're printing out the Frame Time every 1000 frames
+        // so as to not bloat the terminal window with more
+        static int frameCount = 0;
+        if (++frameCount >= 1000)
+        {
+            std::cout << "Frame Time:" << deltaTime * 1000.0f << "ms | FPS:" << 1.0f / deltaTime << std::endl;
+            frameCount = 0;
+        }
     }
 
     return 0;
