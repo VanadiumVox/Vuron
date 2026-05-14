@@ -14,43 +14,60 @@
 #include <iostream>
 #include <chrono>
 
+
+// This is the old main function before CVDisplayLink was implemented.
+// Leaving this here just in case.
+// int main()
+// {
+//     vuron::MacWindow myWindow;
+//
+//     if (!myWindow.init())
+//     {
+//         std::cout << "Failed to initialize Vuron Window" << std::endl;
+//         return -1;
+//     }
+//
+//     // Capturing the start time
+//     auto lastTime = std::chrono::high_resolution_clock::now();
+//
+//     std::cout << "Vuron Engine started" << std::endl;
+//
+//     // Main Delta Time loop
+//     while (true)
+//     {
+//         // Here, we calculate the delta time (don't ask)
+//         auto currentTime = std::chrono::high_resolution_clock::now();
+//         std::chrono::duration<float> elapsed = currentTime - lastTime;
+//         float deltaTime = elapsed.count();
+//         lastTime = currentTime;
+//
+//         // Over here we update the platform, with any other registered inputs
+//         // like mouse clicks or resizes
+//         myWindow.update();
+//
+//         // ----TEMP----
+//         // For testing, we're printing out the Frame Time every 1000 frames
+//         // so as to not bloat the terminal window with more
+//         static int frameCount = 0;
+//         if (++frameCount >= 1000)
+//         {
+//             std::cout << "Frame Time:" << deltaTime * 1000.0f << "ms | FPS:" << 1.0f / deltaTime << std::endl;
+//             frameCount = 0;
+//         }
+//     }
+//
+//     return 0;
+// }
+
+
 int main()
 {
     vuron::MacWindow myWindow;
+    myWindow.init();
 
-    if (!myWindow.init())
+    while (!myWindow.shouldClose())
     {
-        std::cout << "Failed to initialize Vuron Window" << std::endl;
-        return -1;
-    }
-
-    // Capturing the start time
-    auto lastTime = std::chrono::high_resolution_clock::now();
-
-    std::cout << "Vuron Engine started" << std::endl;
-
-    // Main Delta Time loop
-    while (true)
-    {
-        // Here, we calculate the delta time (don't ask)
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> elapsed = currentTime - lastTime;
-        float deltaTime = elapsed.count();
-        lastTime = currentTime;
-
-        // Over here we update the platform, with any other registered inputs
-        // like mouse clicks or resizes
         myWindow.update();
-
-        // ----TEMP----
-        // For testing, we're printing out the Frame Time every 1000 frames
-        // so as to not bloat the terminal window with more
-        static int frameCount = 0;
-        if (++frameCount >= 1000)
-        {
-            std::cout << "Frame Time:" << deltaTime * 1000.0f << "ms | FPS:" << 1.0f / deltaTime << std::endl;
-            frameCount = 0;
-        }
     }
 
     return 0;

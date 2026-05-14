@@ -3,6 +3,26 @@
 
 namespace vuron
 {
+	// This is a Static Callback function. It allows the Mac's OS to call
+	// it whenever it wants. It doesn't belong to any one specific object since
+	// it's static. So we've "snuck" a pointer to MacWindow into it by casting
+	// the context back into the MacWindow.
+	static CVReturn VuronDisplayLinkCallback(CVDisplayLinkRef displayLink,
+                                         const CVTimeStamp* inNow,
+                                         const CVTimeStamp* inOutputTime,
+                                         CVOptionFlags flagsIn,
+                                         CVOptionFlags* flagsOut,
+                                         void* displayLinkContext)
+    {
+          // This is the "Heartbeat"
+          // We cast our 'context' back into a MacWindow
+          vuron::MacWindow* window = (vuron::MacWindow*)displayLinkContext;
+          // This triggers the update logic
+          window->renderFrame();
+          // Return success
+          return kCVReturnSuccess;
+    }
+
     bool MacWindow::init(){
       // Creating the window's position, and size
       NSRect frame = NSMakeRect(0, 0, 1280, 720);
@@ -18,6 +38,16 @@ namespace vuron
               styleMask : styleMask
               backing:NSBackingStoreBuffered
               defer:NO];
+
+      CVDisplayLinkCreateWithActiveCGDisplays((CVDisplayLinkRef*)&m_displayLink);
+      CVDisplayLinkSetOutputCallback((CVDisplayLinkRef)m_displayLink, &VuronDisplayLinkCallback, this);
+
+      //CGLContextObj cglContext = // We'll set this up when we add metal/opengl
+      //CGLPixelFormatObj cglPixelFormat = // Same here
+
+      //For now, we'll just start it
+      CVDisplayLinkStart((CVDisplayLinkRef)m_displayLink);
+      m_running = true;
 
       if (!window) {
         return false;
@@ -76,5 +106,10 @@ namespace vuron
         // Send the event to the OS to handle basic events like moving the window
         [NSApp sendEvent:event];
       }
+    }
+
+    void MacWindow::renderFrame() {
+      // This is for the 3D rendering and logic
+      // To be implemented later, so the engine just 'ticks' in the background
     }
 }

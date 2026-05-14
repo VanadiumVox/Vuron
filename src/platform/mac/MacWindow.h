@@ -26,9 +26,17 @@ namespace vuron
         void update() override;
         void close() override;
 
+        // Public function
+        void renderFrame();
+        // This fulfils the contract to let main.cpp see m_shouldClose
+        bool shouldClose() const override { return m_shouldClose; }
+
     private:
         void* m_windowHandle; // Using void* because we don't want
         // Mac-specific headers in the C++ headers YET
+        void* m_displayLink; // CVDisplayLinkRef
+        bool m_running;
+        bool m_shouldClose = false;
     };
 }
 

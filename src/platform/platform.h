@@ -19,6 +19,9 @@ namespace vuron
         virtual bool init() = 0;
         virtual void update() = 0;
         virtual void close() = 0;
+
+        // Added this to the contract
+        virtual bool shouldClose() const = 0;
     };
 
 }
