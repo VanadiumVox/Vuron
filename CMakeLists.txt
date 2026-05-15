@@ -16,7 +16,9 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 # Add the executable
 add_executable(Vuron ${SOURCES}
         src/platform/platform.h
-        src/platform/mac/MacWindow.h)
+        src/platform/mac/MacWindow.h
+        src/core/Memory.h
+        src/core/Memory.cpp)
 
 # Platform-specific configurations
 if(APPLE)

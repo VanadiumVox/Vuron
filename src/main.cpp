@@ -13,6 +13,7 @@
 #include "platform/mac/MacWindow.h"
 #include <iostream>
 #include <chrono>
+#include <thread>
 
 
 // This is the old main function before CVDisplayLink was implemented.
@@ -68,6 +69,8 @@ int main()
     while (!myWindow.shouldClose())
     {
         myWindow.update();
+        // Reduces CPU% usage from ~99.7% to 3.4%
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     return 0;
