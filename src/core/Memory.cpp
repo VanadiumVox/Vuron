@@ -34,17 +34,17 @@ namespace vuron
         return arena;
     }
 
-    void* MemoryArena::push(size_t requestSize)
+    void* vuron::MemoryArena::push(size_t requestSize)
     {
         // Alignment = the "Crisp" part
         // CPUs tend to access memory faster when aligned to 8 or 16 bytes
-        std::size_t alignment = 0;
+        std::size_t alignment = 8;
         std::size_t alignedSize = (requestSize + (alignment - 1)) & ~(alignment - 1);
 
-        if (offset + alignedSize <= size)
+        if (this->offset + alignedSize <= this->size)
         {
-            void* ptr = (void*)((uint8_t*)base + offset);
-            offset += alignedSize;
+            void* ptr = (void*)((uint8_t*)base + this->offset);
+            this->offset += alignedSize;
             return ptr;
         }
 
