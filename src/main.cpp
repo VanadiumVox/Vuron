@@ -81,43 +81,43 @@
 // }
 
 
-// This one was just mostly used for testing 
-// int main()
-// {
-//     // Create the Global Arena (512 MB)
-//     vuron::MemoryArena globalArena = vuron::create_arena(512);
-//     if (!globalArena.base) return -1;
-//
-//     // Allocating the Window from the Arena.
-//     // We ask the exact size of the class
-//     void* windowMemory = globalArena.push(sizeof(vuron::MacWindow));
-//     std::cout << "DEBUG: Memory Address: " << windowMemory << std::endl;
-//
-//     // Use "Placement New" to initialize the obj into the Arena
-//     vuron::MacWindow* myWindow = new (windowMemory) vuron::MacWindow();
-//
-//     if (!myWindow->init())
-//     {
-//         std::cout << "Failed to Initialize Vuron" << std::endl;
-//         return -1;
-//     }
-//
-//     std::cout << "Vuron Arena Active. Offset: " << globalArena.offset << std::endl;
-//
-//     // Second smaller arena for temporary stuff
-//     vuron::MemoryArena frameArena = vuron::create_arena(64);
-//     while (!myWindow->shouldClose())
-//     {
-//         myWindow->update();
-//         frameArena.reset(); // Instant cleanup
-//         // Tell the CPU to chill dawg
-//         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-//     }
-//
-//     // Clean everything up and close it
-//     myWindow->close();
-//     vuron::destroy_arena(globalArena);
-//
-//     return 0;
-//
-// }
+// This one was just mostly used for testing
+int main()
+{
+    // Create the Global Arena (512 MB)
+    vuron::MemoryArena globalArena = vuron::create_arena(512);
+    if (!globalArena.base) return -1;
+
+    // Allocating the Window from the Arena.
+    // We ask the exact size of the class
+    void* windowMemory = globalArena.push(sizeof(vuron::MacWindow));
+    std::cout << "DEBUG: Memory Address: " << windowMemory << std::endl;
+
+    // Use "Placement New" to initialize the obj into the Arena
+    vuron::MacWindow* myWindow = new (windowMemory) vuron::MacWindow();
+
+    if (!myWindow->init())
+    {
+        std::cout << "Failed to Initialize Vuron" << std::endl;
+        return -1;
+    }
+
+    std::cout << "Vuron Arena Active. Offset: " << globalArena.offset << std::endl;
+
+    // Second smaller arena for temporary stuff
+    vuron::MemoryArena frameArena = vuron::create_arena(64);
+    while (!myWindow->shouldClose())
+    {
+        myWindow->update();
+        frameArena.reset(); // Instant cleanup
+        // Tell the CPU to chill dawg
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    // Clean everything up and close it
+    myWindow->close();
+    vuron::destroy_arena(globalArena);
+
+    return 0;
+
+}
