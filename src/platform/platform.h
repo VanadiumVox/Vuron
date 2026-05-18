@@ -7,6 +7,9 @@
 
 namespace vuron
 {
+    // Forward Declaration
+    struct MemoryArena;
+
     class PlatformWindow
     {
     public:
@@ -16,11 +19,9 @@ namespace vuron
 
         // Defining Pure Virtual functions,
         // forcing any platform to implement them
-        virtual bool init() = 0;
+        virtual bool init(MemoryArena& arena) = 0;
         virtual void update() = 0;
         virtual void close() = 0;
-
-        // Added this to the contract
         virtual bool shouldClose() const = 0;
     };
 

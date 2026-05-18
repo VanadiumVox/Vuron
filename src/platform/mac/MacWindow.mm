@@ -1,5 +1,8 @@
 #include "MacWindow.h"
 #import <Cocoa/Cocoa.h> // import = Objective-C version of include
+#include "../../renderer/MetalRenderer.h"
+#include "../../core/Memory.h"
+#include <new> // For placement new
 
 namespace vuron
 {
@@ -23,7 +26,12 @@ namespace vuron
           return kCVReturnSuccess;
     }
 
-    bool MacWindow::init(){
+    bool MacWindow::init(MemoryArena& arena){
+      // Initializing the global NSApp obj if it hasn't been already
+      [NSApplication sharedApplication];
+      // This just tells the OS that this is a regular "app"
+      [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
       // Creating the window's position, and size
       NSRect frame = NSMakeRect(0, 0, 1280, 720);
                    //NSMakeRect(float x, float y, float width, float height)
@@ -39,40 +47,26 @@ namespace vuron
               backing:NSBackingStoreBuffered
               defer:NO];
 
-      CVDisplayLinkCreateWithActiveCGDisplays((CVDisplayLinkRef*)&m_displayLink);
-      CVDisplayLinkSetOutputCallback((CVDisplayLinkRef)m_displayLink, &VuronDisplayLinkCallback, this);
-
-      //CGLContextObj cglContext = // We'll set this up when we add metal/opengl
-      //CGLPixelFormatObj cglPixelFormat = // Same here
-
-      //For now, we'll just start it
-      CVDisplayLinkStart((CVDisplayLinkRef)m_displayLink);
-      m_running = true;
-
-      if (!window) {
-        return false;
-      }
-
-      // Initializing the global NSApp obj if it hasn't been already
-      [NSApplication sharedApplication];
-      // This just tells the OS that this is a regular "app"
-      [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+      if (!window) return false;
 
       // Window creation code
       // Set the window title as Vuron Enigne
       [window setTitle:@"Vuron Engine"];
       // Bring the window to the front of the screen when opened
       [window makeKeyAndOrderFront:nil];
+      // Brings the Vuron window to the front when we activate the engine
+      [NSApp activateIgnoringOtherApps:YES];
+
       // Saving the handle for later use in update and close functions
       m_windowHandle = (void*)window;
 
-      // Brings the Vuron window to the front when we activate the engine
-      [NSApp activateIgnoringOtherApps:YES];
-      [window makeKeyAndOrderFront:nil];
-      // Optimization for raw connection to the screen
-      [window setHasShadow:YES];
-      [window setAcceptsMouseMovedEvents:YES];
+      // ALlocate the new Metal Renderer straight out of the Permanent Arena
+      void* rendererMemory = arena.push(sizeof(MetalRenderer));
+      m_renderer = new (rendererMemory) MetalRenderer();
 
+      if (!m_renderer->init(m_windowHandle)) return false;
+
+      // Initialize CVDisplayLink here if it's nto already active
       return true;
 
     }
@@ -110,6 +104,6 @@ namespace vuron
 
     void MacWindow::renderFrame() {
       // This is for the 3D rendering and logic
-      // To be implemented later, so the engine just 'ticks' in the background
+      if (m_renderer) m_renderer->drawFrame();
     }
 }

@@ -136,7 +136,7 @@ int main()
     void* windowMemory = permanentArena.push(sizeof(vuron::MacWindow));
     vuron::MacWindow* myWindow = new (windowMemory) vuron::MacWindow();
 
-    if (!myWindow->init())
+    if (!myWindow->init(permanentArena))
     {
         return -1;
     }

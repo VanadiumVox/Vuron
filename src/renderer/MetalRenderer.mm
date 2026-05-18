@@ -50,7 +50,7 @@ namespace vuron {
       if (!drawable) return;
 
       // Configure a render pass to clear the window color
-      MTLRenderPassDescriptor* renderPassDesc = [MTLRenderPassDescriptor renderPassRescriptor];
+      MTLRenderPassDescriptor* renderPassDesc = [MTLRenderPassDescriptor renderPassDescriptor];
       renderPassDesc.colorAttachments[0].texture = drawable.texture;
       renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionClear;
 
