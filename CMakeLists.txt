@@ -9,7 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.mm")
 
 # 3. Create the executable
-add_executable(vuron_engine ${SOURCES})
+add_executable(vuron_engine ${SOURCES}
+        src/renderer/MetalRenderer.h)
 
 # 4. Link the Apple Frameworks (Cocoa for Window, CoreVideo for Heartbeat)
 target_link_libraries(vuron_engine "-framework Cocoa" "-framework CoreVideo")

@@ -9,6 +9,8 @@
 
 namespace vuron
 {
+    struct MemoryArena;
+    class MetalRenderer;
     class MacWindow : public PlatformWindow
     {
     public:
@@ -22,7 +24,7 @@ namespace vuron
 
         // Used 'override' keyword to make sure these match
         // the base class of PlatformWindow in platform.h
-        bool init() override;
+        bool init(MemoryArena& arena);
         void update() override;
         void close() override;
 
@@ -37,6 +39,7 @@ namespace vuron
         void* m_displayLink; // CVDisplayLinkRef
         bool m_running;
         bool m_shouldClose = false;
+        MetalRenderer* m_metalRenderer = nullptr;
     };
 }
 
