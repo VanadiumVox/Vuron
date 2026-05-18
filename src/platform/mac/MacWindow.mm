@@ -1,5 +1,6 @@
 #include "MacWindow.h"
 #import <Cocoa/Cocoa.h> // import = Objective-C version of include
+#import <CoreVideo/CVDisplayLink.h>
 #include "../../renderer/MetalRenderer.h"
 #include "../../core/Memory.h"
 #include <new> // For placement new
@@ -67,6 +68,10 @@ namespace vuron
       if (!m_renderer->init(m_windowHandle)) return false;
 
       // Initialize CVDisplayLink here if it's nto already active
+      CVDisplayLinkCreateWithActiveCGDisplays((CVDisplayLinkRef*)&m_displayLink);
+      CVDisplayLinkSetOutputCallback((CVDisplayLinkRef)m_displayLink, &VuronDisplayLinkCallback, this);
+      CVDisplayLinkStart((CVDisplayLinkRef)m_displayLink);
+      m_running = true;
       return true;
 
     }
@@ -75,13 +80,15 @@ namespace vuron
     // We managing our own memory, we manually call close without Automatic
     // Reference Counting. Because 'alloc' must eventually 'release', we use this instead
     void MacWindow::close() {
-      if (m_windowHandle) {
-        // Casting back from void* to the actual Mac obj
-        NSWindow* window = (NSWindow*)m_windowHandle;
-        // Tell the OS to close the window
-        [window close];
-        // Set it back to nullptr so we don't close it twice
-        m_windowHandle = nullptr;
+      // Clean up the "heartbeat"
+      if (m_displayLink) {
+        CVDisplayLinkStop((CVDisplayLinkRef)m_displayLink);
+        CVDisplayLinkRelease((CVDisplayLinkRef)m_displayLink);
+      }
+
+      // Clean up the Metal
+      if (m_renderer) {
+        m_renderer->shutdown();
       }
     }
 
@@ -102,6 +109,7 @@ namespace vuron
       }
     }
 
+    // Called by the "heartbeat", displays the pixels
     void MacWindow::renderFrame() {
       // This is for the 3D rendering and logic
       if (m_renderer) m_renderer->drawFrame();
