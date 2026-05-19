@@ -6,7 +6,7 @@
 #include <iostream>
 
 namespace vuron {
-    MetalRenderer::MetalRenderer() : m_device(nullptr), m_commandQueue(nullptr), m_metalLayer(nullptr) {}
+    MetalRenderer::MetalRenderer() : m_device(nullptr), m_commandQueue(nullptr), m_metalLayer(nullptr), m_pipelineState(nullptr) {}
     MetalRenderer::~MetalRenderer() { shutdown(); }
 
     bool MetalRenderer::init(void* windowHandle) {
@@ -36,6 +36,42 @@ namespace vuron {
       [view setLayer:metalLayer];
 
       m_metalLayer = (void*)metalLayer;
+
+      // Loading and compiling the Shader File at Runtime
+      NSString* shaderPath = @"src/renderer/Shaders.metal";
+      NSError* error = nil;
+      NSString* shaderSource = [NSString stringWithContentsOfFile:shaderPath encoding:NSUTF8StringEncoding error:&error];
+
+      if (!shaderSource) {
+        std::cerr << "Vuron Error: Could not locate Shaders.metal." << std::endl;
+        return false;
+      }
+
+      id <MTLLibrary> library = [device newLibraryWithSource:shaderSource options:nil error:&error];
+      if (!library) {
+        std::cerr << "Shader compilation error (you didn't install Minecraft Shaders, did you?)" << [[error localizedDescription] UTF8String] << std::endl;
+        return false;
+      }
+
+      // Extract our specific functions by name
+      id<MTLFunction> vertexFunc = [library newFunctionWithName:@"vertexMain"];
+      id<MTLFunction> fragmentFunc = [library newFunctionWithName:@"fragmentMain"];
+
+      // Creating the pipeline descriptor
+      MTLRenderPipelineDescriptor* pipelineDesc = [[MTLRenderPipelineDescriptor alloc] init];
+      pipelineDesc.vertexFunction = vertexFunc;
+      pipelineDesc.fragmentFunction = fragmentFunc;
+      // Telling the shader that the output must perfectly match window's color format
+      pipelineDesc.colorAttachments[0].pixelFormat = metalLayer.pixelFormat;
+
+      // Baking the pipeline descriptor into the GPUs memory
+      id<MTLRenderPipelineState> pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
+      if (!pipelineState) {
+        std::cerr << "Pipeline error: " << [[error localizedDescription] UTF8String] << std::endl;
+        return false;
+      }
+      m_pipelineState = (void*)pipelineState;
+      std::cout << "Vuron Shaders successfuly compiled" << std::endl;
       return true;
     }
 

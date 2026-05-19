@@ -21,6 +21,7 @@ namespace vuron
         void* m_device; // id<MTLDevice>
         void* m_commandQueue; // id<MTLCommandQueue>
         void* m_metalLayer; // CAMetalLayer*
+        void* m_pipelineState; // id<MTLRenderPipelineState>
 
     };
 }
