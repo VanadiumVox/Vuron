@@ -10,7 +10,8 @@ file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.mm")
 
 # 3. Create the executable
 add_executable(vuron_engine ${SOURCES}
-        src/renderer/MetalRenderer.h)
+        src/renderer/MetalRenderer.h
+        src/math/Math.h)
 
 # 4. Link the Apple Frameworks (Cocoa for Window, CoreVideo for Heartbeat)
 # --- APPLE FRAMEWORKS ---
