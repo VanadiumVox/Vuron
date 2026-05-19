@@ -31,7 +31,7 @@ namespace vuron
       // Initializing the global NSApp obj if it hasn't been already
       [NSApplication sharedApplication];
       // This just tells the OS that this is a regular "app"
-      [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+      [NSApp finishLaunching];
 
       // Creating the window's position, and size
       NSRect frame = NSMakeRect(0, 0, 1280, 720);
@@ -94,8 +94,8 @@ namespace vuron
 
     // Update function *VERY IMPORTANT*
     void MacWindow::update() {
-      // We're casting the handle so we can talk to the window directly
-      NSWindow* window = (NSWindow*)m_windowHandle;
+      // This pool prevents OS window events from leaking memory every frame
+      @autoreleasepool {
       // This is the main "Event Loop" which pulls messages from the MacOS queue
       NSEvent* event;
       while ((event = [NSApp nextEventMatchingMask:NSEventMaskAny
@@ -107,6 +107,7 @@ namespace vuron
         // Send the event to the OS to handle basic events like moving the window
         [NSApp sendEvent:event];
       }
+     }
     }
 
     // Called by the "heartbeat", displays the pixels

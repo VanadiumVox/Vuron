@@ -4,9 +4,10 @@
 #import <Appkit/NSWindow.h>
 #import <AppKit/NSView.h>
 #include <iostream>
+#include "../math/Math.h"
 
 namespace vuron {
-    MetalRenderer::MetalRenderer() : m_device(nullptr), m_commandQueue(nullptr), m_metalLayer(nullptr), m_pipelineState(nullptr) {}
+    MetalRenderer::MetalRenderer() : m_device(nullptr), m_commandQueue(nullptr), m_metalLayer(nullptr), m_pipelineState(nullptr), m_vertexBuffer(nullptr) {}
     MetalRenderer::~MetalRenderer() { shutdown(); }
 
     bool MetalRenderer::init(void* windowHandle) {
@@ -27,13 +28,15 @@ namespace vuron {
       m_commandQueue = (void*)commandQueue;
 
       // Create the Metal canvas layer and attach it to the window
-      CAMetalLayer* metalLayer = [CAMetalLayer layer];
-      metalLayer.device = device;
+      //Setup the Canvas
+      CAMetalLayer* metalLayer = [[CAMetalLayer alloc] init];
+      metalLayer.device = device; // CRITICAL - tell the cnavas which GPU to use
       metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+      metalLayer.frame = window.contentView.bounds; // Match physical window size
 
-      NSView* view = [window contentView];
-      [view setWantsLayer:YES];
-      [view setLayer:metalLayer];
+      // Screwing the canvas into the window
+      window.contentView.wantsLayer = YES;
+      window.contentView.layer = metalLayer;
 
       m_metalLayer = (void*)metalLayer;
 
@@ -72,18 +75,38 @@ namespace vuron {
       }
       m_pipelineState = (void*)pipelineState;
       std::cout << "Vuron Shaders successfuly compiled" << std::endl;
+
+      // --=TEMP=--
+      // Creating the first Triangle in Vuron
+      vuron::Vertex triangleVertices[] = {
+        {{ 0.0f, 0.5f, 0.0f}, { 1.0f, 0.0f, 0.0f}}, // Top line Red
+        {{ 0.5f, -0.5f, 0.0f}, { 0.0f, 1.0f, 0.0f}}, // Bottom right green
+        {{ -0.5f, -0.5f, 0.0f}, { 0.0f, 0.0f, 1.0f}}, // Bottom left blue
+      };
+
+      // Allocating memory and copying the triangle into it
+      id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:triangleVertices
+                                    length:(sizeof(vuron::Vertex) * 3)
+                                    options:MTLResourceStorageModeShared];
+      m_vertexBuffer = (void*)vertexBuffer;
+
       return true;
     }
 
     void MetalRenderer::drawFrame() {
+    @autoreleasepool{
       if (!m_metalLayer || !m_commandQueue) return;
 
+      // Casting the raw void* into Apple Hardware pointers
       CAMetalLayer* layer = (CAMetalLayer*)m_metalLayer;
       id<MTLCommandQueue> queue = (id<MTLCommandQueue>)m_commandQueue;
 
-      // Get the next available screen frame swap surface
+      // Ask the hardware for the next screen frame
       id<CAMetalDrawable> drawable = [layer nextDrawable];
       if (!drawable) return;
+
+      // Create the command buffer
+      id<MTLCommandBuffer> commandBuffer = [queue commandBuffer];
 
       // Configure a render pass to clear the window color
       MTLRenderPassDescriptor* renderPassDesc = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -94,13 +117,23 @@ namespace vuron {
       renderPassDesc.colorAttachments[0].clearColor = MTLClearColorMake(0.1, 0.14, 0.18, 1.0);
       renderPassDesc.colorAttachments[0].storeAction = MTLStoreActionStore;
 
-      id<MTLCommandBuffer> commandBuffer = [queue commandBuffer];
-      id<MTLCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+      id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+
+      // New draw commands
+      if (m_pipelineState && m_vertexBuffer) {
+        //Tell the GPU which instruction manual (shader) to use
+        [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_pipelineState];
+        //Bind our GPU memory to slot 0
+        [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
+        // Executing the draw call - 3 vertices at index 0
+        [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+      }
 
       [encoder endEncoding];
       [commandBuffer presentDrawable:drawable];
-      [commandBuffer commit]; // Ship it to the screen hardware
+      [commandBuffer commit];
     }
+}
 
     void MetalRenderer::shutdown() {
       m_metalLayer = nullptr;

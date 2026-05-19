@@ -4,8 +4,8 @@ using namespace metal;
 
 // The input structure, matching the C++ vertex
 struct VertexIn {
-    float3 position;
-    float3 color;
+    packed_float3 position;
+    packed_float3 color;
 };
 
 // The output structure to hand to the next bit of code
