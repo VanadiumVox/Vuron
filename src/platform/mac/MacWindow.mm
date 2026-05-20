@@ -92,7 +92,7 @@ namespace vuron
       }
     }
 
-    // Update function *VERY IMPORTANT*
+    //Update function *VERY IMPORTANT*
     void MacWindow::update() {
       // This pool prevents OS window events from leaking memory every frame
       @autoreleasepool {

@@ -10,7 +10,7 @@ struct VertexIn {
 
 // The output structure to hand to the next bit of code
 struct VertexOut {
-// [[position]] tells the mac hardware that "This is the final coordinate on screen"
+//[[position]] tells the mac hardware that "This is the final coordinate on screen"
     float4 position [[position]];
     float3 color;
 };

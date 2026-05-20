@@ -121,9 +121,9 @@ namespace vuron {
 
       // New draw commands
       if (m_pipelineState && m_vertexBuffer) {
-        //Tell the GPU which instruction manual (shader) to use
+        // Tell the GPU which instruction manual (shader) to use
         [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_pipelineState];
-        //Bind our GPU memory to slot 0
+        // Bind our GPU memory to slot 0
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
         // Executing the draw call - 3 vertices at index 0
         [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
