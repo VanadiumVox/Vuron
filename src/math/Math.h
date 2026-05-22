@@ -5,6 +5,8 @@
 #ifndef VURONENGINE_MATH_H
 #define VURONENGINE_MATH_H
 
+#include <cmath>
+
 namespace vuron
 {
     // Just a lean, 3D vector
@@ -38,6 +40,23 @@ namespace vuron
             result.m[2][2] = 1.0f;
             result.m[3][3] = 1.0f;
             return result;
+        }
+
+        // Creates a Z-axis Rotation matrix
+        static Matrix4x4 rotationZ(float angle) {
+        Matrix4x4 result = {0};
+
+        float c = std::cos(angle);
+        float s = std::sin(angle);
+
+        result.m[0][0] = c;
+        result.m[0][1] = -s;
+        result.m[1][0] = s;
+        result.m[1][1] = c;
+        result.m[2][2] = 1.0f;
+        result.m[3][3] = 1.0f;
+
+        return result;
         }
 
         //Matrix multiplication

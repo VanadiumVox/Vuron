@@ -17,18 +17,16 @@ struct VertexOut {
 
 // The math program (runs on GPU cores)
 vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
-                constant VertexIn* vertices [[buffer(0)]])
+            constant VertexIn* vertices [[buffer(0)]],
+            constant float4x4& modelMatrix [[buffer(1)]]) //The new bridge
 {
     VertexOut out;
-
-    //Grab the specific vertex for this specific GPU thread
     VertexIn in = vertices[VertexID];
 
-    // Convert (x,y,z) into 4D screen space (x,y,z,w)
-    // The 'w' bit is important for Matrix multiplication (yeah, I learned this in colleg)
-    out.position = float4(in.position, 1.0);
+    // C++ arrays are row-major, and Metal is column-major. By putting the
+    // vector first, we're naturally transposing the math without wasting cycles
+    out.position = float4(in.position, 1.0) * modelMatrix;
 
-    // Pass the color
     out.color = in.color;
 
     return out;

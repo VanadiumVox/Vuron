@@ -121,10 +121,22 @@ namespace vuron {
 
       // New draw commands
       if (m_pipelineState && m_vertexBuffer) {
+        // --=The Engine's Timepiece=--
+        // Any static variable survives between frames. Because CVDisplayLink is locked to
+        // the monitor's refresh rate, adding a fixed number here guarantees a smooth spin
+        static float angle = 0.0f;
+        angle += 0.02f;
+
+        vuron::Matrix4x4 modelMatrix = vuron::Matrix4x4::rotationZ(angle);
+
+        // ----------------------------------------
+
         // Tell the GPU which instruction manual (shader) to use
         [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_pipelineState];
         // Bind our GPU memory to slot 0
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
+        // Inject the matrix directly into GPU Register slot 1
+        [encoder setVertexBytes:&modelMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
         // Executing the draw call - 3 vertices at index 0
         [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
       }
