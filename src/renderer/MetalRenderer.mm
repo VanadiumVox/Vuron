@@ -127,12 +127,15 @@ namespace vuron {
         static float angle = 0.0f;
         angle += 0.02f;
 
-        // Rotate geometry
-        vuron::Matrix4x4 rotation = vuron::Matrix4x4::rotationZ(angle);
-        // Counteracting 720p window squish
-        vuron::Matrix4x4 aspectCorrection = vuron::Matrix4x4::scale(0.5625f, 1.0f, 1.0f);
-
-        vuron::Matrix4x4 modelMatrix = rotation * aspectCorrection;
+        // Model : Spin the triangle around the z-axis
+        vuron::Matrix4x4 modelMatrix = vuron::Matrix4x4::rotationZ(angle);
+        // View : Push the triangle 2 units into the screen, away from the camera
+        vuron::Matrix4x4 viewMatrix = vuron::Matrix4x4::translation(0.0f, 0.0f, 2.0f);
+        // Projection : Create a 45º camera lens at 16:9 aspect ratio
+        float aspectRatio = 1280.0f / 720.0f;
+        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspective(45.0f, aspectRatio, 0.1f, 100.0f);
+        // The MVP chain : Multiply in order: Model --> View --> Projection
+        vuron::Matrix4x4 mvpMatrix = modelMatrix * viewMatrix * projectionMatrix;
 
         // ----------------------------------------
 
@@ -141,7 +144,7 @@ namespace vuron {
         // Bind our GPU memory to slot 0
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
         // Inject the matrix directly into GPU Register slot 1
-        [encoder setVertexBytes:&modelMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
+        [encoder setVertexBytes:&mvpMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
         // Executing the draw call - 3 vertices at index 0
         [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
       }

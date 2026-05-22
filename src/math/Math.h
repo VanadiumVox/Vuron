@@ -6,6 +6,7 @@
 #define VURONENGINE_MATH_H
 
 #include <cmath>
+#include <numbers>
 
 namespace vuron
 {
@@ -65,6 +66,36 @@ namespace vuron
             result.m[0][0] = sx;
             result.m[1][1] = sy;
             result.m[2][2] = sz;
+            return result;
+        }
+
+        // Creates a Translation matrix
+        static Matrix4x4 translation(float tx, float ty, float tz) {
+            Matrix4x4 result = identity();
+            // Stored in the bottom row as our Shader multiplies Vector * Matrix
+            result.m[3][0] = tx;
+            result.m[3][1] = ty;
+            result.m[3][2] = tz;
+            return result;
+        }
+
+        // Creates a 3D Perspective Lens
+        static Matrix4x4 perspective(float fovDegrees, float aspect, float nearZ, float farZ) {
+            float fovRadians = fovDegrees * (std::numbers::pi_v<float> / 180.0f);
+            float yScale = 1.0f / std::tan(fovRadians * 0.5f);
+            float xScale = yScale / aspect;
+            float zRange = farZ - nearZ;
+
+            Matrix4x4 result = {0};
+            result.m[0][0] = xScale;
+            result.m[1][1] = yScale;
+
+            // Apple Metal uses a left-handed coordinate system(Z pushes into the screen)
+            // and maps depth from 0.0 to 1.0
+            result.m[2][2] = farZ / zRange;
+            result.m[2][3] = 1.0f;
+            result.m[3][2] = -(nearZ * farZ) / zRange;
+
             return result;
         }
 

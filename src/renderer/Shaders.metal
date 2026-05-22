@@ -18,14 +18,14 @@ struct VertexOut {
 // The math program (runs on GPU cores)
 vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
             constant VertexIn* vertices [[buffer(0)]],
-            constant float4x4& modelMatrix [[buffer(1)]]) //The new bridge
+            constant float4x4& mvpMatrix [[buffer(1)]]) //The new bridge
 {
     VertexOut out;
     VertexIn in = vertices[VertexID];
 
     // C++ arrays are row-major, and Metal is column-major. By putting the
     // vector first, we're naturally transposing the math without wasting cycles
-    out.position = float4(in.position, 1.0) * modelMatrix;
+    out.position = float4(in.position, 1.0) * mvpMatrix;
 
     out.color = in.color;
 
