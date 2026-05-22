@@ -59,6 +59,15 @@ namespace vuron
         return result;
         }
 
+        // Creates a Scaling matrix
+        static Matrix4x4 scale(float sx, float sy, float sz){
+            Matrix4x4 result = identity();
+            result.m[0][0] = sx;
+            result.m[1][1] = sy;
+            result.m[2][2] = sz;
+            return result;
+        }
+
         //Matrix multiplication
         Matrix4x4 operator*(const Matrix4x4& other) const
         {

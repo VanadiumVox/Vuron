@@ -79,9 +79,9 @@ namespace vuron {
       // --=TEMP=--
       // Creating the first Triangle in Vuron
       vuron::Vertex triangleVertices[] = {
-        {{ 0.0f, 0.5f, 0.0f}, { 1.0f, 0.0f, 0.0f}}, // Top line Red
-        {{ 0.5f, -0.5f, 0.0f}, { 0.0f, 1.0f, 0.0f}}, // Bottom right green
-        {{ -0.5f, -0.5f, 0.0f}, { 0.0f, 0.0f, 1.0f}}, // Bottom left blue
+        {{ 0.0f, 0.577f, 0.0f}, { 1.0f, 0.0f, 0.0f}}, // Top line Red
+        {{ 0.5f, -0.288f, 0.0f}, { 0.0f, 1.0f, 0.0f}}, // Bottom right green
+        {{ -0.5f, -0.288f, 0.0f}, { 0.0f, 0.0f, 1.0f}}, // Bottom left blue
       };
 
       // Allocating memory and copying the triangle into it
@@ -127,7 +127,12 @@ namespace vuron {
         static float angle = 0.0f;
         angle += 0.02f;
 
-        vuron::Matrix4x4 modelMatrix = vuron::Matrix4x4::rotationZ(angle);
+        // Rotate geometry
+        vuron::Matrix4x4 rotation = vuron::Matrix4x4::rotationZ(angle);
+        // Counteracting 720p window squish
+        vuron::Matrix4x4 aspectCorrection = vuron::Matrix4x4::scale(0.5625f, 1.0f, 1.0f);
+
+        vuron::Matrix4x4 modelMatrix = rotation * aspectCorrection;
 
         // ----------------------------------------
 
