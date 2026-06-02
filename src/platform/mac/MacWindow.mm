@@ -61,6 +61,15 @@ namespace vuron
       // Saving the handle for later use in update and close functions
       m_windowHandle = (void*)window;
 
+      // The closing 'x' button code
+      // Listens for the OS notification saying that the window's closing
+      [[NSNotificationCenter defaultCenter] addObserverForName:NSWindowWillCloseNotification
+                                                  object:window
+                                                  queue:nil
+                                                  usingBlock:^(NSNotification *notification){
+         exit(0);
+       }];
+
       // ALlocate the new Metal Renderer straight out of the Permanent Arena
       void* rendererMemory = arena.push(sizeof(MetalRenderer));
       m_renderer = new (rendererMemory) MetalRenderer();
@@ -104,6 +113,16 @@ namespace vuron
               dequeue:YES]))
 
       {
+        // The 'cmd+q' intercept
+        // This checks if the event si a key press
+        if (event.type == NSEventTypeKeyDown) {
+            // Checking if Cmd is held, and Q is pressed
+            if (([event modifierFlags] & NSEventModifierFlagCommand) &&
+            [[event charactersIgnoringModifiers] isEqualToString:@"q"]){
+            exit(0); // Kill Vuron (noooooooo)
+            }
+        }
+        // --------------------------
         // Send the event to the OS to handle basic events like moving the window
         [NSApp sendEvent:event];
       }
