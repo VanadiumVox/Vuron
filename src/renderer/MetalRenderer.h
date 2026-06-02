@@ -23,6 +23,7 @@ namespace vuron
         void* m_metalLayer; // CAMetalLayer*
         void* m_pipelineState; // id<MTLRenderPipelineState>
         void* m_vertexBuffer; //  id<MTLBuffer>
+        void* m_indexBuffer; // id<MTLBuffer.
 
     };
 }

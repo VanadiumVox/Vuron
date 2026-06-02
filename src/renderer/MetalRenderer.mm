@@ -78,17 +78,52 @@ namespace vuron {
 
       // --=TEMP=--
       // Creating the first Triangle in Vuron
-      vuron::Vertex triangleVertices[] = {
-        {{ 0.0f, 0.577f, 0.0f}, { 1.0f, 0.0f, 0.0f}}, // Top line Red
-        {{ 0.5f, -0.288f, 0.0f}, { 0.0f, 1.0f, 0.0f}}, // Bottom right green
-        {{ -0.5f, -0.288f, 0.0f}, { 0.0f, 0.0f, 1.0f}}, // Bottom left blue
-      };
+//       vuron::Vertex triangleVertices[] = {
+//         {{ 0.0f, 0.577f, 0.0f}, { 1.0f, 0.0f, 0.0f}}, // Top line Red
+//         {{ 0.5f, -0.288f, 0.0f}, { 0.0f, 1.0f, 0.0f}}, // Bottom right green
+//         {{ -0.5f, -0.288f, 0.0f}, { 0.0f, 0.0f, 1.0f}}, // Bottom left blue
+//       };
+//
+//       // Allocating memory and copying the triangle into it
+//       id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:triangleVertices
+//                                     length:(sizeof(vuron::Vertex) * 3)
+//                                     options:MTLResourceStorageModeShared];
+//       m_vertexBuffer = (void*)vertexBuffer;
 
-      // Allocating memory and copying the triangle into it
-      id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:triangleVertices
-                                    length:(sizeof(vuron::Vertex) * 3)
+        // Creating the first Vuron Cube
+        vuron::Vertex cubeVertices[] = {
+        // Front face (z = -0.5)
+        {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 0: Top Left (Red)
+        {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // 1: Top Right (Green)
+        {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 2: Bottom Left (Blue)
+        {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 3: Bottom Right (Yellow)
+        // Back face (z = 0.5)
+        {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}, // 4: Top Left (Magenta)
+        {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 5: Top Right (Cyan)
+        {{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}}, // 6: Bottom Left (White)
+        {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 0.0f}}, // 7: Bottom Right (Black)
+        };
+
+        uint16_t cubeIndices[] = {
+        0, 2, 1,  1, 2, 3, // Front
+        1, 3, 5,  5, 3, 7, // Right
+        5, 7, 4,  4, 7, 6, // Back
+        4, 6, 0,  0, 6, 2, // Left
+        4, 0, 5,  5, 0, 1, // Top
+        2, 6, 3,  3, 6, 7  // Bottom
+        };
+
+      // 1. Sending 8 points to the GPU
+      id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:cubeVertices
+                                    length:(sizeof(vuron::Vertex) * 8)
                                     options:MTLResourceStorageModeShared];
       m_vertexBuffer = (void*)vertexBuffer;
+
+      //2. Sending instruction map to the GPU
+      id<MTLBuffer> indexBuffer = [device newBufferWithBytes:cubeIndices
+                                    length:(sizeof(uint16_t) * 36)
+                                    options:MTLResourceStorageModeShared];
+      m_indexBuffer = (void*)indexBuffer;
 
       return true;
     }
@@ -145,8 +180,13 @@ namespace vuron {
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
         // Inject the matrix directly into GPU Register slot 1
         [encoder setVertexBytes:&mvpMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
-        // Executing the draw call - 3 vertices at index 0
-        [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+        // -=New Indexed draw call=-
+        // Execute the draw using the map, connecting the dots
+        [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                            indexCount:36
+                            indexType:MTLIndexTypeUInt16
+                            indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                            indexBufferOffset:0];
       }
 
       [encoder endEncoding];
