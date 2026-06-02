@@ -30,6 +30,8 @@ namespace vuron
     bool MacWindow::init(MemoryArena& arena){
       // Initializing the global NSApp obj if it hasn't been already
       [NSApplication sharedApplication];
+      // Forcing MacOS to treat this as a normal app with its own icon and all
+      [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
       // This just tells the OS that this is a regular "app"
       [NSApp finishLaunching];
 
