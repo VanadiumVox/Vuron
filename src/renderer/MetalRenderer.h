@@ -23,7 +23,9 @@ namespace vuron
         void* m_metalLayer; // CAMetalLayer*
         void* m_pipelineState; // id<MTLRenderPipelineState>
         void* m_vertexBuffer; //  id<MTLBuffer>
-        void* m_indexBuffer; // id<MTLBuffer.
+        void* m_indexBuffer; // id<MTLBuffer
+        void* m_depthTexture; // Stores z-dist of every pixel instead of color
+        void* m_depthStencilState; // only re-draw if z-dist is smaller than cached
 
     };
 }

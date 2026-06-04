@@ -66,6 +66,8 @@ namespace vuron {
       pipelineDesc.fragmentFunction = fragmentFunc;
       // Telling the shader that the output must perfectly match window's color format
       pipelineDesc.colorAttachments[0].pixelFormat = metalLayer.pixelFormat;
+      // Tell the pipeline to expect 32-bit Float depth math
+      pipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
 
       // Baking the pipeline descriptor into the GPUs memory
       id<MTLRenderPipelineState> pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
@@ -76,7 +78,30 @@ namespace vuron {
       m_pipelineState = (void*)pipelineState;
       std::cout << "Vuron Shaders successfuly compiled" << std::endl;
 
-      // --=TEMP=--
+      // ----------------------------------------------------
+
+      // -=The Depth Stencil (z-buffer)=-
+      // Creating the rules for it to follow
+      MTLDepthStencilDescriptor* depthDesc = [[MTLDepthStencilDescriptor alloc] init];
+      // Only draw if closer to the camera
+      depthDesc.depthCompareFunction = MTLCompareFunctionLess;
+      // Allow writing new distances to the canvas
+      depthDesc.depthWriteEnabled = YES;
+
+      id<MTLDepthStencilState> depthStencilState = [device newDepthStencilStateWithDescriptor:depthDesc];
+      m_depthStencilState = (void*)depthStencilState;
+
+      // Creating the invisible depth canvas (matching 1280x720p window size)
+      MTLTextureDescriptor* depthTexDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                                            width:1280
+                                            height:720
+                                            mipmapped:NO];
+      depthTexDesc.usage = MTLTextureUsageRenderTarget;
+      depthTexDesc.storageMode = MTLStorageModePrivate; // Keep this memory strictly on GPU
+
+      id<MTLTexture> depthTexture = [device newTextureWithDescriptor:depthTexDesc];
+      m_depthTexture = (void*)depthTexture;
+
       // Creating the first Triangle in Vuron
 //       vuron::Vertex triangleVertices[] = {
 //         {{ 0.0f, 0.577f, 0.0f}, { 1.0f, 0.0f, 0.0f}}, // Top line Red
@@ -147,10 +172,15 @@ namespace vuron {
       MTLRenderPassDescriptor* renderPassDesc = [MTLRenderPassDescriptor renderPassDescriptor];
       renderPassDesc.colorAttachments[0].texture = drawable.texture;
       renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionClear;
-
       // Vuron Dark Slate Blue background color : ClearColorMake(R, G, B, A)
       renderPassDesc.colorAttachments[0].clearColor = MTLClearColorMake(0.1, 0.14, 0.18, 1.0);
       renderPassDesc.colorAttachments[0].storeAction = MTLStoreActionStore;
+
+      // Attaching the Depth canvas to the render pass
+      renderPassDesc.depthAttachment.texture = (id<MTLTexture>)m_depthTexture;
+      renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear; // Clead old distances
+      renderPassDesc.depthAttachment.clearDepth = 1.0; // Reset canvas to max dist (1)
+      renderPassDesc.depthAttachment.storeAction = MTLStoreActionDontCare; // discard after drawing
 
       id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
 
@@ -162,13 +192,19 @@ namespace vuron {
         static float angle = 0.0f;
         angle += 0.02f;
 
-        // Model : Spin the triangle around the z-axis
-        vuron::Matrix4x4 modelMatrix = vuron::Matrix4x4::rotationZ(angle);
-        // View : Push the triangle 2 units into the screen, away from the camera
-        vuron::Matrix4x4 viewMatrix = vuron::Matrix4x4::translation(0.0f, 0.0f, 2.0f);
-        // Projection : Create a 45º camera lens at 16:9 aspect ratio
-        float aspectRatio = 1280.0f / 720.0f;
-        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspective(45.0f, aspectRatio, 0.1f, 100.0f);
+        // Model : Spin the triangle around the z and x axes
+        vuron::Matrix4x4 rotationX = vuron::Matrix4x4::rotationX(angle);
+        vuron::Matrix4x4 rotationZ = vuron::Matrix4x4::rotationZ(angle * 0.7f); // slightly slower, to see better
+        vuron::Matrix4x4 modelMatrix = rotationX * rotationZ;
+        // View : Push the triangle x units into the screen, away from the camera
+        vuron::Matrix4x4 viewMatrix = vuron::Matrix4x4::translation(0.0f, 0.0f, 4.0f);
+        // Projection : Dynamically calculate aspect ratio based on current window size
+        CAMetalLayer* currentLayer = (CAMetalLayer*)m_metalLayer;
+        CGSize size = currentLayer.bounds.size;
+        // Prevents div by 0 for when window minimizes
+        float currentAspect = size.width / (size.height > 0 ? size.height : 1.0f);
+
+        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspective(45.0f, currentAspect, 0.1f, 100.0f);
         // The MVP chain : Multiply in order: Model --> View --> Projection
         vuron::Matrix4x4 mvpMatrix = modelMatrix * viewMatrix * projectionMatrix;
 
@@ -180,7 +216,8 @@ namespace vuron {
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
         // Inject the matrix directly into GPU Register slot 1
         [encoder setVertexBytes:&mvpMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
-        // -=New Indexed draw call=-
+        // Tell the GPU cores to strictly enforce depth rules
+        [encoder setDepthStencilState:(id<MTLDepthStencilState>)m_depthStencilState];
         // Execute the draw using the map, connecting the dots
         [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                             indexCount:36
