@@ -165,6 +165,25 @@ namespace vuron {
       id<CAMetalDrawable> drawable = [layer nextDrawable];
       if (!drawable) return;
 
+      // -=Dynamic Depth Canvas=-
+      // If the OS resizes the window, the Depth canvas must be rebuilt based on the new grid
+      id<MTLTexture> depthTex = (id<MTLTexture>)m_depthTexture;
+      if (depthTex.width != drawable.texture.width || depthTex.height != drawable.texture.height) {
+
+        id<MTLDevice> device = drawable.texture.device;
+
+        MTLTextureDescriptor* depthTexDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                                              width:drawable.texture.width
+                                              height:drawable.texture.height
+                                              mipmapped:NO];
+        depthTexDesc.usage = MTLTextureUsageRenderTarget;
+        depthTexDesc.storageMode = MTLStorageModePrivate;
+
+        //Overwrite old memory with the newly sized canvas
+        m_depthTexture = (void*)[device newTextureWithDescriptor:depthTexDesc];
+      }
+      // --------------------------------------------------
+
       // Create the command buffer
       id<MTLCommandBuffer> commandBuffer = [queue commandBuffer];
 
@@ -192,17 +211,16 @@ namespace vuron {
         static float angle = 0.0f;
         angle += 0.02f;
 
-        // Model : Spin the triangle around the z and x axes
+        // Model : Spin the triangle around the x and y axes
         vuron::Matrix4x4 rotationX = vuron::Matrix4x4::rotationX(angle);
-        vuron::Matrix4x4 rotationZ = vuron::Matrix4x4::rotationZ(angle * 0.7f); // slightly slower, to see better
-        vuron::Matrix4x4 modelMatrix = rotationX * rotationZ;
+        vuron::Matrix4x4 rotationY = vuron::Matrix4x4::rotationY(angle * 0.7f); // slightly slower, to see better
+        vuron::Matrix4x4 modelMatrix = rotationX * rotationY;
         // View : Push the triangle x units into the screen, away from the camera
         vuron::Matrix4x4 viewMatrix = vuron::Matrix4x4::translation(0.0f, 0.0f, 4.0f);
         // Projection : Dynamically calculate aspect ratio based on current window size
-        CAMetalLayer* currentLayer = (CAMetalLayer*)m_metalLayer;
-        CGSize size = currentLayer.bounds.size;
         // Prevents div by 0 for when window minimizes
-        float currentAspect = size.width / (size.height > 0 ? size.height : 1.0f);
+        // Fixed by calculating aspect ratio by using physical GPU pixels to prevent stretching
+        float currentAspect = (float)drawable.texture.width / (float)(drawable.texture.height > 0 ? drawable.texture.height : 1.0f);
 
         vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspective(45.0f, currentAspect, 0.1f, 100.0f);
         // The MVP chain : Multiply in order: Model --> View --> Projection

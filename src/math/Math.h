@@ -43,6 +43,34 @@ namespace vuron
             return result;
         }
 
+        // Creates an X-axis Rotation matrix
+        static Matrix4x4 rotationX(float angle){
+            Matrix4x4 result = identity();
+            float c = std::cos(angle);
+            float s = std::sin(angle);
+
+            result.m[1][1] = c;
+            result.m[1][2] = -s;
+            result.m[2][1] = s;
+            result.m[2][2] = c;
+
+            return result;
+        }
+
+        // Creates a Y-axis Rotation matrix
+        static Matrix4x4 rotationY(float angle) {
+            Matrix4x4 result = identity();
+            float c = std::cos(angle);
+            float s = std::sin(angle);
+
+            result.m[0][0] = c;
+            result.m[0][2] = s;
+            result.m[2][0] = -s;
+            result.m[2][2] = c;
+
+            return result;
+        }
+
         // Creates a Z-axis Rotation matrix
         static Matrix4x4 rotationZ(float angle) {
         Matrix4x4 result = {0};
@@ -58,20 +86,6 @@ namespace vuron
         result.m[3][3] = 1.0f;
 
         return result;
-        }
-
-        // Creates an X-axis Rotation matrix
-        static Matrix4x4 rotationX(float angle){
-            Matrix4x4 result = identity();
-            float c = std::cos(angle);
-            float s = std::sin(angle);
-
-            result.m[1][1] = c;
-            result.m[1][2] = -s;
-            result.m[2][1] = s;
-            result.m[2][2] = c;
-
-            return result;
         }
 
         // Creates a Scaling matrix

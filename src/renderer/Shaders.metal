@@ -25,7 +25,7 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
 
     // C++ arrays are row-major, and Metal is column-major. By putting the
     // vector first, we're naturally transposing the math without wasting cycles
-    out.position = float4(in.position, 1.0) * mvpMatrix;
+    out.position = mvpMatrix * float4(in.position, 1.0);
 
     out.color = in.color;
 
