@@ -219,37 +219,53 @@ namespace vuron {
         static float angle = 0.0f;
         angle += 0.02f;
 
-        // Model : Spin the triangle around the x and y axes
-        vuron::Matrix4x4 rotationX = vuron::Matrix4x4::rotationX(angle);
-        vuron::Matrix4x4 rotationY = vuron::Matrix4x4::rotationY(angle * 0.7f); // slightly slower, to see better
-        vuron::Matrix4x4 modelMatrix = rotationX * rotationY;
-        // View : Push the triangle x units into the screen, away from the camera
-        vuron::Matrix4x4 viewMatrix = vuron::Matrix4x4::translation(0.0f, 0.0f, 4.0f);
-        // Projection : Dynamically calculate aspect ratio based on current window size
-        // 1500.0f is the zoom level. Increase = bigger, decrease = ..... You get it.
+        // 1. Defining the camera (once per frame)
+        // Backing the cam up a bit more to fit everything
+        vuron::Matrix4x4 viewMatrix = vuron::Matrix4x4::translation(0.0f, 0.0f, 6.0f);
+
         float screenW = (float)drawable.texture.width;
         float screenH = (float)drawable.texture.height > 0 ? (float)drawable.texture.height : 1.0f;
-
         vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(screenW, screenH, 1500.0f, 0.1f, 100.0f);
-        // The MVP chain : Multiply in order: Model --> View --> Projection
-        vuron::Matrix4x4 mvpMatrix = modelMatrix * viewMatrix * projectionMatrix;
 
-        // ----------------------------------------
+        // 2. Defining the entities(just saw the backrooms movie, ts wasn't really scary)
+        vuron::Transform cubes[3];
 
-        // Tell the GPU which instruction manual (shader) to use
+        // Cube 0 - Dead center, standard tumble
+        cubes[0].position = {0.0f, 0.0f, 0.0f};
+        cubes[0].rotation = {angle, angle * 0.7f, 0.0f};
+
+        // Cube 1 - Shifted left, spinning on Z and Y
+        cubes[1].position = {-2.0f, 0.0f, 0.0f};
+        cubes[1].rotation = {0.0f, angle, angle * 0.5f};
+
+        // Cube 2 - Shifted right, tumbling fast, and shrunk in half
+        cubes[2].position = {2.0f, 0.0f, 0.0f};
+        cubes[2].rotation = {angle * 2.0f, angle * 2.0f, 0.0f};
+        cubes[2].scale = {0.5f, 0.5f, 0.5f};
+
+        // 3. Prepping the GPU Pipeline
         [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_pipelineState];
-        // Bind our GPU memory to slot 0
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
-        // Inject the matrix directly into GPU Register slot 1
-        [encoder setVertexBytes:&mvpMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
-        // Tell the GPU cores to strictly enforce depth rules
         [encoder setDepthStencilState:(id<MTLDepthStencilState>)m_depthStencilState];
-        // Execute the draw using the map, connecting the dots
-        [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                            indexCount:36
-                            indexType:MTLIndexTypeUInt16
-                            indexBuffer:(id<MTLBuffer>)m_indexBuffer
-                            indexBufferOffset:0];
+
+        // 4. The Rendering loop (every entity drawn independently)
+        for (int i = 0; i < 3; ++i) {
+
+            // Calculate this specific cube's final matrix
+            vuron::Matrix4x4 modelMatrix = cubes[i].getModelMatrix();
+            vuron::Matrix4x4 mvpMatrix = modelMatrix * viewMatrix * projectionMatrix;
+
+            // Inject the matrix directly into GPU Register slot 1
+            [encoder setVertexBytes:&mvpMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
+
+            // Execute the draw using the map, connecting the dots
+            [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                indexCount:36
+                                indexType:MTLIndexTypeUInt16
+                                indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                                indexBufferOffset:0];
+
+        }
       }
 
       [encoder endEncoding];

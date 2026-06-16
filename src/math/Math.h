@@ -164,6 +164,28 @@ namespace vuron
             return result;
         }
     };
+
+    // A 3D transform that holds position, rotation and scale for any entity
+    struct Transform
+    {
+        Vector3 position = {0.0f, 0.0f, 0.0f};
+        Vector3 rotation = {0.0f, 0.0f, 0.0f};
+        Vector3 scale = {1.0f, 1.0f, 1.0f};
+
+        // Automatically generates the Model Matrix for the entity
+        Matrix4x4 getModelMatrix() const
+        {
+            Matrix4x4 s = Matrix4x4::scale(scale.x, scale.y, scale.z);
+            Matrix4x4 rx = Matrix4x4::rotationX(rotation.x);
+            Matrix4x4 ry = Matrix4x4::rotationY(rotation.y);
+            Matrix4x4 rz = Matrix4x4::rotationZ(rotation.z);
+            Matrix4x4 t = Matrix4x4::translation(position.x, position.y, position.z);
+
+            // Order matters a LOT here.
+            // Scale first, then Rotate, then Translate
+            return s * rx * ry * rz * t;
+        }
+    };
 }
 
 #endif //VURONENGINE_MATH_H
