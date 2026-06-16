@@ -115,6 +115,9 @@ namespace vuron
               dequeue:YES]))
 
       {
+        // A flag to track if Vuron is eating the input
+        bool handled = false;
+
         // -=Raw hardware input interception=-
         if (event.type == NSEventTypeKeyDown) {
             // Convert the keystroke into a string
@@ -126,22 +129,25 @@ namespace vuron
             }
 
             // Route the movement keys directly to the Renderer's input bridge
-            if ([chars isEqualToString:@"w"]) m_renderer->setKeyState('w', true);
-            if ([chars isEqualToString:@"a"]) m_renderer->setKeyState('a', true);
-            if ([chars isEqualToString:@"s"]) m_renderer->setKeyState('s', true);
-            if ([chars isEqualToString:@"d"]) m_renderer->setKeyState('d', true);
+            if ([chars isEqualToString:@"w"]) {m_renderer->setKeyState('w', true); handled = true;}
+            if ([chars isEqualToString:@"a"]) {m_renderer->setKeyState('a', true); handled = true;}
+            if ([chars isEqualToString:@"s"]) {m_renderer->setKeyState('s', true); handled = true;}
+            if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', true); handled = true;}
         }
         // When the key is released, stop movement instantly
         else if (event.type == NSEventTypeKeyUp) {
             NSString* chars = [[event charactersIgnoringModifiers] lowercaseString];
-            if ([chars isEqualToString:@"w"]) m_renderer->setKeyState('w', false);
-            if ([chars isEqualToString:@"a"]) m_renderer->setKeyState('a', false);
-            if ([chars isEqualToString:@"s"]) m_renderer->setKeyState('s', false);
-            if ([chars isEqualToString:@"d"]) m_renderer->setKeyState('d', false);
+            if ([chars isEqualToString:@"w"]) {m_renderer->setKeyState('w', false); handled = true;}
+            if ([chars isEqualToString:@"a"]) {m_renderer->setKeyState('a', false); handled = true;}
+            if ([chars isEqualToString:@"s"]) {m_renderer->setKeyState('s', false); handled = true;}
+            if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', false); handled = true;}
         }
         // --------------------------
         // Send the event to the OS to handle basic events like moving the window
-        [NSApp sendEvent:event];
+        // Only send the event to the OS if Vuron didn't need it
+        if (!handled) {
+            [NSApp sendEvent:event];
+        }
       }
      }
     }
