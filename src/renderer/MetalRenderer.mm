@@ -7,8 +7,20 @@
 #include "../math/Math.h"
 
 namespace vuron {
-    MetalRenderer::MetalRenderer() : m_device(nullptr), m_commandQueue(nullptr), m_metalLayer(nullptr), m_pipelineState(nullptr), m_vertexBuffer(nullptr) {}
+    // Constructor & destructor
+    MetalRenderer::MetalRenderer() : m_device(nullptr), m_commandQueue(nullptr), m_metalLayer(nullptr), m_pipelineState(nullptr), m_vertexBuffer(nullptr), m_indexBuffer(nullptr), m_depthTexture(nullptr), m_depthStencilState(nullptr) {}
     MetalRenderer::~MetalRenderer() { shutdown(); }
+
+    // -=The input Bridge=-
+    // Changes flags the exact millisecond a key is pressed
+    // Bypasses standard keyboard delay
+    void MetalRenderer::setKeyState(char key, bool isPressed) {
+        if (key == 'w') m_keyW = isPressed;
+        if (key == 'a') m_keyA = isPressed;
+        if (key == 's') m_keyS = isPressed;
+        if (key == 'd') m_keyD = isPressed;
+    }
+    // ---------------------------------------------------------
 
     bool MetalRenderer::init(void* windowHandle) {
       if (!windowHandle) return false;
@@ -219,9 +231,23 @@ namespace vuron {
         static float angle = 0.0f;
         angle += 0.02f;
 
-        // 1. Defining the camera (once per frame)
-        // Backing the cam up a bit more to fit everything
-        vuron::Matrix4x4 viewMatrix = vuron::Matrix4x4::translation(0.0f, 0.0f, 6.0f);
+        // 1. Defining the camera (once per frame) & Process Input
+        // The static keyword ensures camera survives between frames
+        static vuron::Camera camera;
+
+        // Kinematic velocity (increase to move faster)
+        float speed = 0.1f;
+
+        // Z pushes into the screen
+        if (m_keyW) camera.position.z += speed; // Move forward
+        if (m_keyS) camera.position.z -= speed; // Move backwards
+
+        // X moves horizonatlly across the screen
+        if (m_keyA) camera.position.x -= speed; // Move left
+        if (m_keyD) camera.position.x += speed; // Move right
+
+        // Grab the inverse matrix to physically shift the universe around the player
+        vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();
 
         float screenW = (float)drawable.texture.width;
         float screenH = (float)drawable.texture.height > 0 ? (float)drawable.texture.height : 1.0f;

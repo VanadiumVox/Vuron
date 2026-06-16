@@ -115,14 +115,29 @@ namespace vuron
               dequeue:YES]))
 
       {
-        // The 'cmd+q' intercept
-        // This checks if the event si a key press
+        // -=Raw hardware input interception=-
         if (event.type == NSEventTypeKeyDown) {
-            // Checking if Cmd is held, and Q is pressed
-            if (([event modifierFlags] & NSEventModifierFlagCommand) &&
-            [[event charactersIgnoringModifiers] isEqualToString:@"q"]){
-            exit(0); // Kill Vuron (noooooooo)
+            // Convert the keystroke into a string
+            NSString* chars = [[event charactersIgnoringModifiers] lowercaseString];
+
+            // Engine Killswitch (cmd + q)
+            if ([chars isEqualToString:@"q"] && ([event modifierFlags] & NSEventModifierFlagCommand)) {
+                exit(0);
             }
+
+            // Route the movement keys directly to the Renderer's input bridge
+            if ([chars isEqualToString:@"w"]) m_renderer->setKeyState('w', true);
+            if ([chars isEqualToString:@"a"]) m_renderer->setKeyState('a', true);
+            if ([chars isEqualToString:@"s"]) m_renderer->setKeyState('s', true);
+            if ([chars isEqualToString:@"d"]) m_renderer->setKeyState('d', true);
+        }
+        // When the key is released, stop movement instantly
+        else if (event.type == NSEventTypeKeyUp) {
+            NSString* chars = [[event charactersIgnoringModifiers] lowercaseString];
+            if ([chars isEqualToString:@"w"]) m_renderer->setKeyState('w', false);
+            if ([chars isEqualToString:@"a"]) m_renderer->setKeyState('a', false);
+            if ([chars isEqualToString:@"s"]) m_renderer->setKeyState('s', false);
+            if ([chars isEqualToString:@"d"]) m_renderer->setKeyState('d', false);
         }
         // --------------------------
         // Send the event to the OS to handle basic events like moving the window

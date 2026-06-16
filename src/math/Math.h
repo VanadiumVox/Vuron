@@ -186,6 +186,21 @@ namespace vuron
             return s * rx * ry * rz * t;
         }
     };
+
+    // The Player's POV in the 3D Universe
+    struct Camera {
+        // Starting pushed back from the origin so we don't spawn in a cube
+        Vector3 position = {0.0f, 0.0f, -6.0f};
+
+        // Generating the View matrix for the GPU
+        Matrix4x4 getViewMatrix() const
+        {
+            // The camera cannot physically move from (0,0,0) on the monitor
+            // So, to make it look like we're moving forward, we make the entire
+            // universe move backwards to compensate, giving the illusion of movement
+            return Matrix4x4::translation(-position.x, -position.y, -position.z);
+        }
+    };
 }
 
 #endif //VURONENGINE_MATH_H

@@ -17,6 +17,9 @@ namespace vuron
         void drawFrame();
         void shutdown();
 
+        // Exposes a bridge so OS can tell Vuron if a key is pressed
+        void setKeyState(char key, bool isPressed);
+
         private:
         void* m_device; // id<MTLDevice>
         void* m_commandQueue; // id<MTLCommandQueue>
@@ -26,6 +29,13 @@ namespace vuron
         void* m_indexBuffer; // id<MTLBuffer
         void* m_depthTexture; // Stores z-dist of every pixel instead of color
         void* m_depthStencilState; // only re-draw if z-dist is smaller than cached
+
+        // Hardware state flags for zero-latency movement
+        // These stay true when held down
+        bool m_keyW = false;
+        bool m_keyA = false;
+        bool m_keyS = false;
+        bool m_keyD = false;
 
     };
 }
