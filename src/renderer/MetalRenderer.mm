@@ -161,6 +161,14 @@ namespace vuron {
       CAMetalLayer* layer = (CAMetalLayer*)m_metalLayer;
       id<MTLCommandQueue> queue = (id<MTLCommandQueue>)m_commandQueue;
 
+      // -=The Resizing hook=-
+      // Forces the physical GPu texture to mach window size every frame
+      CGSize currentSize = layer.bounds.size;
+      if (layer.drawableSize.width != currentSize.width || layer.drawableSize.height != currentSize.height) {
+        layer.drawableSize = currentSize;
+      }
+      // ----------------------------------------
+
       // Ask the hardware for the next screen frame
       id<CAMetalDrawable> drawable = [layer nextDrawable];
       if (!drawable) return;
@@ -218,11 +226,11 @@ namespace vuron {
         // View : Push the triangle x units into the screen, away from the camera
         vuron::Matrix4x4 viewMatrix = vuron::Matrix4x4::translation(0.0f, 0.0f, 4.0f);
         // Projection : Dynamically calculate aspect ratio based on current window size
-        // Prevents div by 0 for when window minimizes
-        // Fixed by calculating aspect ratio by using physical GPU pixels to prevent stretching
-        float currentAspect = (float)drawable.texture.width / (float)(drawable.texture.height > 0 ? drawable.texture.height : 1.0f);
+        // 1500.0f is the zoom level. Increase = bigger, decrease = ..... You get it.
+        float screenW = (float)drawable.texture.width;
+        float screenH = (float)drawable.texture.height > 0 ? (float)drawable.texture.height : 1.0f;
 
-        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspective(45.0f, currentAspect, 0.1f, 100.0f);
+        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(screenW, screenH, 1500.0f, 0.1f, 100.0f);
         // The MVP chain : Multiply in order: Model --> View --> Projection
         vuron::Matrix4x4 mvpMatrix = modelMatrix * viewMatrix * projectionMatrix;
 

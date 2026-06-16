@@ -127,6 +127,24 @@ namespace vuron
             return result;
         }
 
+        // This creates a Fixed-scale lens, meaning resizing crops the view,
+        // it doesn't shrink the world.
+        static Matrix4x4 perspectiveFixed(float screenWidth, float screenHeight, float zoom, float nearZ, float farZ) {
+            Matrix4x4 result = {0};
+
+            // By scaling inversely to the screen's dimensions, the window size
+            // completely cancels out of the GPU's final pixel math
+            result.m[0][0] = zoom / screenWidth;
+            result.m[1][1] = zoom / screenHeight;
+
+            float zRange = farZ - nearZ;
+            result.m[2][2] = farZ / zRange;
+            result.m[2][3] = 1.0f;
+            result.m[3][2] = -(nearZ * farZ) / zRange;
+
+            return result;
+        }
+
         //Matrix multiplication
         Matrix4x4 operator*(const Matrix4x4& other) const
         {

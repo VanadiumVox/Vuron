@@ -23,8 +23,8 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
     VertexOut out;
     VertexIn in = vertices[VertexID];
 
-    // C++ arrays are row-major, and Metal is column-major. By putting the
-    // vector first, we're naturally transposing the math without wasting cycles
+    // NEVER FORGET THIS FIX WHICH SOLVED INTER-DIMENSIONAL CUBES
+    // R.I.P INTER_DIMENSIONAL_CUBE.exe 4th June 2026
     out.position = mvpMatrix * float4(in.position, 1.0);
 
     out.color = in.color;
