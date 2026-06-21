@@ -105,15 +105,19 @@ namespace vuron
 
     //Update function *VERY IMPORTANT*
     void MacWindow::update() {
+
       // This pool prevents OS window events from leaking memory every frame
       @autoreleasepool {
       // This is the main "Event Loop" which pulls messages from the MacOS queue
       NSEvent* event;
+      // Hide the cursor and disconnect it from the OS screen edges
+      CGAssociateMouseAndMouseCursorPosition(NO);
+      [NSCursor hide];
+
       while ((event = [NSApp nextEventMatchingMask:NSEventMaskAny
               untilDate:[NSDate distantPast]
               inMode:NSDefaultRunLoopMode
               dequeue:YES]))
-
       {
         // A flag to track if Vuron is eating the input
         bool handled = false;
@@ -141,6 +145,15 @@ namespace vuron
             if ([chars isEqualToString:@"a"]) {m_renderer->setKeyState('a', false); handled = true;}
             if ([chars isEqualToString:@"s"]) {m_renderer->setKeyState('s', false); handled = true;}
             if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', false); handled = true;}
+        }
+        // Raw Mouse Intercept
+        else if (event.type == NSEventTypeMouseMoved || event.type == NSEventTypeLeftMouseDragged || event.type == NSEventTypeRightMouseDragged) {
+            // Read the raw physical delta from the hardware laser
+            float dx = [event deltaX];
+            float dy = [event deltaY];
+
+            m_renderer->addMouseDelta(dx, dy);
+            handled = true;
         }
         // --------------------------
         // Send the event to the OS to handle basic events like moving the window

@@ -22,6 +22,12 @@ namespace vuron {
     }
     // ---------------------------------------------------------
 
+    // -=Mouse input bridge=-
+    void MetalRenderer::addMouseDelta(float dx, float dy) {
+        m_mouseDeltaX += dx;
+        m_mouseDeltaY += dy;
+    }
+
     bool MetalRenderer::init(void* windowHandle) {
       if (!windowHandle) return false;
       NSWindow* window = (NSWindow*)windowHandle;
@@ -235,16 +241,51 @@ namespace vuron {
         // The static keyword ensures camera survives between frames
         static vuron::Camera camera;
 
-        // Kinematic velocity (increase to move faster)
+        //--Applying Mouse Looking--
+        // Mouse sensitivity
+        float sensitivity = 0.005f;
+
+        camera.yaw += m_mouseDeltaX * sensitivity;
+        camera.pitch += m_mouseDeltaY * sensitivity;
+
+        // Reset camera deltas so screen stops spinning upon mouse inaction
+        m_mouseDeltaX = 0.0f;
+        m_mouseDeltaY = 0.0f;
+
+        // Adding bounds to the pitch so camera doesn't snap its neck
+        if (camera.pitch > 1.5f) camera.pitch = 1.5f; // Max look down (about 85º)
+        if (camera.pitch < -1.5f) camera.pitch = -1.5f; // Max look up (about the same)
+        //---------------------
+
+        // -=Applying FPS movement=-
         float speed = 0.1f;
 
-        // Z pushes into the screen
-        if (m_keyW) camera.position.z += speed; // Move forward
-        if (m_keyS) camera.position.z -= speed; // Move backwards
+        // Trigonometry: Calculate exatly which way "Forwards" and "Right" are based on player's yaw
+        float fwdX = std::sin(camera.yaw);
+        float fwdZ = std::cos(camera.yaw);
+        float rightX = std::cos(camera.yaw);
+        float rightZ = -std::sin(camera.yaw);
 
-        // X moves horizonatlly across the screen
-        if (m_keyA) camera.position.x -= speed; // Move left
-        if (m_keyD) camera.position.x += speed; // Move right
+        // W/S move along forward vector
+        if (m_keyW) {
+            camera.position.x += fwdX * speed;
+            camera.position.z += fwdZ * speed;
+        }
+        if (m_keyS) {
+            camera.position.x -= fwdX * speed;
+            camera.position.z -= fwdZ * speed;
+        }
+
+        // A/D move along the right/left vector
+        if (m_keyA) {
+            camera.position.x -= rightX * speed;
+            camera.position.z -= rightZ * speed;
+        }
+        if (m_keyD) {
+            camera.position.x += rightX * speed;
+            camera.position.z += rightZ * speed;
+        }
+        // -----------------
 
         // Grab the inverse matrix to physically shift the universe around the player
         vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();

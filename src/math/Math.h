@@ -192,13 +192,22 @@ namespace vuron
         // Starting pushed back from the origin so we don't spawn in a cube
         Vector3 position = {0.0f, 0.0f, -6.0f};
 
+        // Player's neck and spine angles
+        float pitch = 0.0f; // Looking up and down
+        float yaw = 0.0f; // Looking left and right
+
         // Generating the View matrix for the GPU
         Matrix4x4 getViewMatrix() const
         {
-            // The camera cannot physically move from (0,0,0) on the monitor
-            // So, to make it look like we're moving forward, we make the entire
-            // universe move backwards to compensate, giving the illusion of movement
-            return Matrix4x4::translation(-position.x, -position.y, -position.z);
+            // 1. Move the universe away from the player
+            Matrix4x4 t = Matrix4x4::translation(-position.x, -position.y, -position.z);
+
+            // 2. Rotate the universe
+            Matrix4x4 ry = Matrix4x4::rotationY(yaw);
+            Matrix4x4 rx = Matrix4x4::rotationX(pitch);
+
+            // Multiply by translating the world first, then spinning it
+            return t * ry * rx;
         }
     };
 }

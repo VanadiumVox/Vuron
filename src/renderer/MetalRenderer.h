@@ -20,6 +20,9 @@ namespace vuron
         // Exposes a bridge so OS can tell Vuron if a key is pressed
         void setKeyState(char key, bool isPressed);
 
+        //Bridge for raw mo0use laster data
+        void addMouseDelta(float dx, float dy);
+
         private:
         void* m_device; // id<MTLDevice>
         void* m_commandQueue; // id<MTLCommandQueue>
@@ -36,6 +39,10 @@ namespace vuron
         bool m_keyA = false;
         bool m_keyS = false;
         bool m_keyD = false;
+
+        // Trackers for how far the mouse moved in the frame
+        float m_mouseDeltaX = 0.0f;
+        float m_mouseDeltaY = 0.0f;
 
     };
 }
