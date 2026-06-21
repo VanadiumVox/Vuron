@@ -137,6 +137,7 @@ namespace vuron
             if ([chars isEqualToString:@"a"]) {m_renderer->setKeyState('a', true); handled = true;}
             if ([chars isEqualToString:@"s"]) {m_renderer->setKeyState('s', true); handled = true;}
             if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', true); handled = true;}
+            if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', true); handled = true;}
         }
         // When the key is released, stop movement instantly
         else if (event.type == NSEventTypeKeyUp) {
@@ -145,6 +146,7 @@ namespace vuron
             if ([chars isEqualToString:@"a"]) {m_renderer->setKeyState('a', false); handled = true;}
             if ([chars isEqualToString:@"s"]) {m_renderer->setKeyState('s', false); handled = true;}
             if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', false); handled = true;}
+            if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', false); handled = true;}
         }
         // Raw Mouse Intercept
         else if (event.type == NSEventTypeMouseMoved || event.type == NSEventTypeLeftMouseDragged || event.type == NSEventTypeRightMouseDragged) {

@@ -40,6 +40,9 @@ namespace vuron
         bool m_keyS = false;
         bool m_keyD = false;
 
+        //Space key for jumping
+        bool m_keySpace = false;
+
         // Trackers for how far the mouse moved in the frame
         float m_mouseDeltaX = 0.0f;
         float m_mouseDeltaY = 0.0f;

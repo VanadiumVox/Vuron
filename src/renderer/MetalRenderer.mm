@@ -19,6 +19,7 @@ namespace vuron {
         if (key == 'a') m_keyA = isPressed;
         if (key == 's') m_keyS = isPressed;
         if (key == 'd') m_keyD = isPressed;
+        if (key == ' ') m_keySpace = isPressed;
     }
     // ---------------------------------------------------------
 
@@ -286,6 +287,32 @@ namespace vuron {
             camera.position.z += rightZ * speed;
         }
         // -----------------
+
+        // --Apply Kinematic Physics (gravity)--
+        float gravity = -0.008f; // The constant downward force
+        float jumpForce = 0.15f; // The upward burst
+        float floorHeight = 0.0f; // --Temp Invisible Floor--
+
+        // 1. Always apply gravity to our vertical velocity
+        camera.velocityY += gravity;
+
+        // 2. Apply the velocity to player's position
+        camera.position.y += camera.velocityY;
+
+        // 3. Collision detection
+        if (camera.position.y < floorHeight) {
+            //Snap to the floor
+            camera.position.y = floorHeight;
+
+            //Stop falling
+            camera.velocityY = 0.0f;
+
+            // Allow jumping only on the ground
+            if (m_keySpace) {
+                camera.velocityY = jumpForce;
+            }
+        }
+        // -------------------------------------
 
         // Grab the inverse matrix to physically shift the universe around the player
         vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();

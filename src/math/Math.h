@@ -196,6 +196,9 @@ namespace vuron
         float pitch = 0.0f; // Looking up and down
         float yaw = 0.0f; // Looking left and right
 
+        // Tracks vertical momentum
+        float velocityY = 0.0f;
+
         // Generating the View matrix for the GPU
         Matrix4x4 getViewMatrix() const
         {
