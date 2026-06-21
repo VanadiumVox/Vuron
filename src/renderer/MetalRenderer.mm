@@ -15,11 +15,43 @@ namespace vuron {
     // Changes flags the exact millisecond a key is pressed
     // Bypasses standard keyboard delay
     void MetalRenderer::setKeyState(char key, bool isPressed) {
-        if (key == 'w') m_keyW = isPressed;
-        if (key == 'a') m_keyA = isPressed;
-        if (key == 's') m_keyS = isPressed;
-        if (key == 'd') m_keyD = isPressed;
-        if (key == ' ') m_keySpace = isPressed;
+        // Z-axis (forward/backwards)
+        if (key == 'w' || key == 's') {
+            if (key == 'w') m_keyW = isPressed;
+            if (key == 's') m_keyS = isPressed;
+
+            if (isPressed) {
+                m_activeZ = key; // The most recent key
+            } else {
+                // If we let go of a key, check if opposite key is still held
+                if (key == 'w' && m_keyS) m_activeZ = 's'; // First w then s
+                else if (key == 's' && m_keyW) m_activeZ = 'w'; // First s then w
+                else m_activeZ = 0; // Neither pressed
+            }
+        }
+
+        //X-axis (left/right)
+        if (key == 'a' || key == 'd') {
+            if (key == 'a') m_keyA = isPressed;
+            if (key == 'd') m_keyD = isPressed;
+
+            if (isPressed) {
+                m_activeX = key; // The most recent key
+            } else {
+                if (key == 'a' && m_keyD) m_activeX = 'd';
+                else if (key == 'd' && m_keyA) m_activeX = 'a';
+                else m_activeX = 0;
+            }
+        }
+
+        // Jump logic
+        if (key == ' ') {
+            m_keySpace = isPressed;
+            // The exact moment you let go
+            if (!isPressed) {
+                m_hasJumped = false;
+            }
+        }
     }
     // ---------------------------------------------------------
 
@@ -268,21 +300,21 @@ namespace vuron {
         float rightZ = -std::sin(camera.yaw);
 
         // W/S move along forward vector
-        if (m_keyW) {
+        if (m_activeZ == 'w') {
             camera.position.x += fwdX * speed;
             camera.position.z += fwdZ * speed;
         }
-        if (m_keyS) {
+        if (m_activeZ == 's') {
             camera.position.x -= fwdX * speed;
             camera.position.z -= fwdZ * speed;
         }
 
         // A/D move along the right/left vector
-        if (m_keyA) {
+        if (m_activeX == 'a') {
             camera.position.x -= rightX * speed;
             camera.position.z -= rightZ * speed;
         }
-        if (m_keyD) {
+        if (m_activeX == 'd') {
             camera.position.x += rightX * speed;
             camera.position.z += rightZ * speed;
         }
@@ -314,15 +346,19 @@ namespace vuron {
 
         // 3. Collision detection
         if (camera.position.y < floorHeight) {
-            //Snap to the floor
-            camera.position.y = floorHeight;
+            camera.position.y = floorHeight; // Snap to the floor
+            camera.velocityY = 0.0f; // Stop falling
 
-            //Stop falling
-            camera.velocityY = 0.0f;
-
-            // Allow jumping only on the ground
-            if (m_keySpace) {
+            // Allow jumping only if we haven't already consumed a spacebar press
+            if (m_keySpace && !m_hasJumped) {
                 camera.velocityY = jumpForce;
+                m_hasJumped = true; // Lock the jump
+            }
+        } else {
+            // If space is pressed while airborne, consume the lock immediately.
+            // They must release and press again
+            if (m_keySpace) {
+                m_hasJumped = true;
             }
         }
         // -------------------------------------

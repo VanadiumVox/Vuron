@@ -43,6 +43,13 @@ namespace vuron
         //Space key for jumping
         bool m_keySpace = false;
 
+        // SOCD (Last-Win) axis trackers
+        char m_activeX = 0;
+        char m_activeZ = 0;
+
+        // Jump spam prevention lock
+        bool m_hasJumped = false;
+
         // Trackers for how far the mouse moved in the frame
         float m_mouseDeltaX = 0.0f;
         float m_mouseDeltaY = 0.0f;
