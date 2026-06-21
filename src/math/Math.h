@@ -25,6 +25,19 @@ namespace vuron
         Vector3 color;
     };
 
+    // An Axis-Aligned Bounding Box (AABB) / Rigid Body
+    struct AABB {
+        Vector3 min; // Bottom-Left-Back corner
+        Vector3 max; // Top-Right-Front corner
+
+        // The master collision check; Returns tru if 2 hitboxes overlap
+        static bool checkCollision(const AABB& a, const AABB& b) {
+            return (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+                   (a.min.y <= b.max.y && a.max.y >= b.min.y) &&
+                   (a.min.z <= b.max.z && a.max.z >= b.min.z);
+        }
+    };
+
     // a 4x4 Matrix for 3D transformations
     struct Matrix4x4
     {
@@ -172,6 +185,15 @@ namespace vuron
         Vector3 rotation = {0.0f, 0.0f, 0.0f};
         Vector3 scale = {1.0f, 1.0f, 1.0f};
 
+        // Generates a 3D hitbox wrapped around the unrotated cube
+        AABB getHitbox() const {
+            // Assuming out base 3D cube model is exactly 2x2x2 units large
+            return {
+                {position.x - scale.x, position.y - scale.y, position.z - scale.z},
+                {position.x + scale.x, position.y + scale.y, position.z + scale.z}
+            };
+        }
+
         // Automatically generates the Model Matrix for the entity
         Matrix4x4 getModelMatrix() const
         {
@@ -198,6 +220,19 @@ namespace vuron
 
         // Tracks vertical momentum
         float velocityY = 0.0f;
+
+        // The Player's hitbox
+        AABB getHitbox() const {
+            float radius = 0.5f; // How FAt the player is
+            float height = 2.0f; // How tall the character is
+
+            // The camera position is at the player's eye-level
+            // So the feet (min.y) are 'height' units below the eyes
+            return {
+                {position.x - radius, position.y - height, position.z - radius},
+                {position.x + radius, position.y + 0.2f, position.z + radius} // 0.2f gives a little headroom
+            };
+        }
 
         // Generating the View matrix for the GPU
         Matrix4x4 getViewMatrix() const

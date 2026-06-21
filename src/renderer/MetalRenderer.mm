@@ -290,89 +290,10 @@ namespace vuron {
         if (camera.pitch < -1.5f) camera.pitch = -1.5f; // Max look up (about the same)
         //---------------------
 
-        // -=Applying FPS movement=-
-        float speed = 0.1f;
-
-        // Trigonometry: Calculate exatly which way "Forwards" and "Right" are based on player's yaw
-        float fwdX = std::sin(camera.yaw);
-        float fwdZ = std::cos(camera.yaw);
-        float rightX = std::cos(camera.yaw);
-        float rightZ = -std::sin(camera.yaw);
-
-        // W/S move along forward vector
-        if (m_activeZ == 'w') {
-            camera.position.x += fwdX * speed;
-            camera.position.z += fwdZ * speed;
-        }
-        if (m_activeZ == 's') {
-            camera.position.x -= fwdX * speed;
-            camera.position.z -= fwdZ * speed;
-        }
-
-        // A/D move along the right/left vector
-        if (m_activeX == 'a') {
-            camera.position.x -= rightX * speed;
-            camera.position.z -= rightZ * speed;
-        }
-        if (m_activeX == 'd') {
-            camera.position.x += rightX * speed;
-            camera.position.z += rightZ * speed;
-        }
-        // -----------------
-
-        // --Apply Kinematic Physics (variable jumps and floating)--
-        float baseGravity = -0.008f; // Standard falling speed
-        float floatGravity = -0.002f; // Slowed fall while holding space
-        float heavyGravity = -0.02f; // Aggressive falling cutting a jump short
-        float jumpForce = 0.15f; // The upward burst
-        float floorHeight = 0.0f; // --Temp Invisible Floor--
-        float currentGravity = baseGravity;
-
-        // Dynamic Gravity Calculator
-        if (camera.velocityY > 0.0f && !m_keySpace) {
-            // Player is moving up, but let go of space early
-            currentGravity = heavyGravity;
-        }
-        else if (camera.velocityY < 0.0f && m_keySpace) {
-            // Player is falling down, but holding spacebar
-            currentGravity = floatGravity;
-        }
-
-        // 1. Always apply gravity to our vertical velocity
-        camera.velocityY += currentGravity;
-
-        // 2. Apply the velocity to player's position
-        camera.position.y += camera.velocityY;
-
-        // 3. Collision detection
-        if (camera.position.y < floorHeight) {
-            camera.position.y = floorHeight; // Snap to the floor
-            camera.velocityY = 0.0f; // Stop falling
-
-            // Allow jumping only if we haven't already consumed a spacebar press
-            if (m_keySpace && !m_hasJumped) {
-                camera.velocityY = jumpForce;
-                m_hasJumped = true; // Lock the jump
-            }
-        } else {
-            // If space is pressed while airborne, consume the lock immediately.
-            // They must release and press again
-            if (m_keySpace) {
-                m_hasJumped = true;
-            }
-        }
-        // -------------------------------------
-
-        // Grab the inverse matrix to physically shift the universe around the player
-        vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();
-
-        float screenW = (float)drawable.texture.width;
-        float screenH = (float)drawable.texture.height > 0 ? (float)drawable.texture.height : 1.0f;
-        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(screenW, screenH, 1500.0f, 0.1f, 100.0f);
-
         // 2. Defining the entities(just saw the backrooms movie, ts wasn't really scary)
-        vuron::Transform cubes[3];
+        vuron::Transform cubes[8];
 
+        // --Original tumbling cubes--
         // Cube 0 - Dead center, standard tumble
         cubes[0].position = {0.0f, 0.0f, 0.0f};
         cubes[0].rotation = {angle, angle * 0.7f, 0.0f};
@@ -385,6 +306,135 @@ namespace vuron {
         cubes[2].position = {2.0f, 0.0f, 0.0f};
         cubes[2].rotation = {angle * 2.0f, angle * 2.0f, 0.0f};
         cubes[2].scale = {0.5f, 0.5f, 0.5f};
+        //----------------------------------
+
+        // The solid floor (index 3)
+        cubes[3].position = {0.0f, -2.5f, 0.0f};
+        cubes[3].rotation = {0.0f, 0.0f, 0.0f};
+        cubes[3].scale = {100.0f, 0.5f, 100.0f};
+
+        // The Staircase Ramp (indices 4, 5)
+        // Placed directly behind the center spinning cube
+        cubes[4].position = {0.0f, -1.75f, 4.0f};
+        cubes[4].rotation = {0.0f, 0.0f, 0.0f};
+        cubes[4].scale = {2.0f, 0.25f, 1.0f}; // First step
+
+        cubes[5].position = {0.0f, -1.25f, 6.0f};
+        cubes[5].rotation = {0.0f, 0.0f, 0.0f};
+        cubes[5].scale = {2.0f, 0.75f, 1.0f}; // Second, higher step
+
+        // Third step
+        cubes[6].position = {0.0f, -0.75f, 8.0f};
+        cubes[6].rotation = {0.0f, 0.0f, 0.0f};
+        cubes[6].scale = {2.0f, 1.25f, 1.0f};
+
+        // Fourth step
+        cubes[7].position = {0.0f, -0.25f, 10.0f};
+        cubes[7].rotation = {0.0f, 0.0f, 0.0f};
+        cubes[7].scale = {2.0f, 1.75f, 1.0f};
+
+        // ===============================================
+        // -= Unified Physics and Movement Engine =-
+        // ===============================================
+        float speed = 0.1f;
+        // Trigonometry: Calculate exatly which way "Forwards" and "Right" are based on player's yaw
+        float fwdX = std::sin(camera.yaw);
+        float fwdZ = std::cos(camera.yaw);
+        float rightX = std::cos(camera.yaw);
+        float rightZ = -std::sin(camera.yaw);
+
+        // 1. Calculate intended horizontal movement
+        float moveX = 0.0f;
+        float moveZ = 0.0f;
+
+        if (m_activeZ == 'w') { moveX += fwdX * speed; moveZ += fwdZ * speed; }
+        else if (m_activeZ == 's') { moveX -= fwdX * speed; moveZ -= fwdZ * speed; }
+
+        if (m_activeX == 'd') { moveX += rightX * speed; moveZ += rightZ * speed; }
+        else if (m_activeX == 'a') { moveX -= rightX * speed; moveZ -= rightZ * speed; }
+
+        // 2. X-axis collision (Move, check, revert if hit)
+        camera.position.x += moveX;
+        for (int i = 0; i < 8; ++i) {
+            if (vuron::AABB::checkCollision(camera.getHitbox(), cubes[i].getHitbox())) {
+                camera.position.x -= moveX; // Wall hit. Slide along it instead
+                break;
+            }
+        }
+
+        // 3. Z-axis collision (move, check, revert if hit)
+        camera.position.z += moveZ;
+        for (int i = 0; i < 8; ++i) {
+            if (vuron::AABB::checkCollision(camera.getHitbox(), cubes[i].getHitbox())) {
+                camera.position.z -= moveZ; // Wall hit
+                break;
+            }
+        }
+
+        // 4. Gravity and Y-axis collision
+        float baseGravity = -0.008f; // Standard falling speed
+        float floatGravity = -0.002f; // Slowed fall while holding space
+        float heavyGravity = -0.02f; // Aggressive falling cutting a jump short
+        float jumpForce = 0.15f; // The upward burst
+
+        float currentGravity = baseGravity;
+        // Dynamic Gravity Calculator
+        if (camera.velocityY > 0.0f && !m_keySpace) {
+            // Player is moving up, but let go of space early
+            currentGravity = heavyGravity;
+        }
+        else if (camera.velocityY < 0.0f && m_keySpace) {
+            // Player is falling down, but holding spacebar
+            currentGravity = floatGravity;
+        }
+
+        // 1. Always apply gravity to our vertical velocity
+        camera.velocityY += currentGravity;
+        // 2. Apply the velocity to player's position
+        camera.position.y += camera.velocityY;
+        bool grounded = false; // The engine must prove we are standing on something
+
+        // 3. Collision detection
+        for (int i = 0; i < 8; ++i) {
+            vuron::AABB cubeBox = cubes[i].getHitbox();
+            if (vuron::AABB::checkCollision(camera.getHitbox(), cubeBox)) {
+
+                // Falling down into a surface (floor)
+                if (camera.velocityY < 0.0f) {
+                    // Snap the player's feet perfectly to the top of the cube
+                    // +0.001f to prevent floating-point glitching
+                    camera.position.y = cubeBox.max.y + 2.001f;
+                    camera.velocityY = 0.0f;
+                    grounded = true;
+                }
+                // Jumping into a surface (ceiling)
+                else if (camera.velocityY > 0.0f) {
+                    // Snap player head to the bottom of the cube
+                    camera.position.y = cubeBox.min.y - 0.201f;
+                    camera.velocityY = 0.0f;
+                }
+                break;
+            }
+        }
+
+        // 4. Jump Execution
+        if (grounded) {
+            if (m_keySpace && !m_hasJumped) {
+                camera.velocityY = jumpForce;
+                m_hasJumped = true;
+            }
+        } else {
+            if (m_keySpace) m_hasJumped = true; // Anti-buffer
+        }
+        // ================================================
+
+        // Grab the inverse matrix to physically shift the universe around the player
+        vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();
+
+        float screenW = (float)drawable.texture.width;
+        float screenH = (float)drawable.texture.height > 0 ? (float)drawable.texture.height : 1.0f;
+        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(screenW, screenH, 1500.0f, 0.1f, 100.0f);
+
 
         // 3. Prepping the GPU Pipeline
         [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_pipelineState];
@@ -392,7 +442,7 @@ namespace vuron {
         [encoder setDepthStencilState:(id<MTLDepthStencilState>)m_depthStencilState];
 
         // 4. The Rendering loop (every entity drawn independently)
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 8; ++i) {
 
             // Calculate this specific cube's final matrix
             vuron::Matrix4x4 modelMatrix = cubes[i].getModelMatrix();
