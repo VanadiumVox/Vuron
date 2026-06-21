@@ -288,13 +288,26 @@ namespace vuron {
         }
         // -----------------
 
-        // --Apply Kinematic Physics (gravity)--
-        float gravity = -0.008f; // The constant downward force
+        // --Apply Kinematic Physics (variable jumps and floating)--
+        float baseGravity = -0.008f; // Standard falling speed
+        float floatGravity = -0.002f; // Slowed fall while holding space
+        float heavyGravity = -0.02f; // Aggressive falling cutting a jump short
         float jumpForce = 0.15f; // The upward burst
         float floorHeight = 0.0f; // --Temp Invisible Floor--
+        float currentGravity = baseGravity;
+
+        // Dynamic Gravity Calculator
+        if (camera.velocityY > 0.0f && !m_keySpace) {
+            // Player is moving up, but let go of space early
+            currentGravity = heavyGravity;
+        }
+        else if (camera.velocityY < 0.0f && m_keySpace) {
+            // Player is falling down, but holding spacebar
+            currentGravity = floatGravity;
+        }
 
         // 1. Always apply gravity to our vertical velocity
-        camera.velocityY += gravity;
+        camera.velocityY += currentGravity;
 
         // 2. Apply the velocity to player's position
         camera.position.y += camera.velocityY;
