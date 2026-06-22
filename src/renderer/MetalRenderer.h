@@ -5,6 +5,9 @@
 #ifndef VURONENGINE_METALRENDERER_H
 #define VURONENGINE_METALRENDERER_H
 
+#include <vector>
+#include "../math/Math.h"
+
 namespace vuron
 {
     class MetalRenderer
@@ -20,8 +23,12 @@ namespace vuron
         // Exposes a bridge so OS can tell Vuron if a key is pressed
         void setKeyState(char key, bool isPressed);
 
-        //Bridge for raw mo0use laster data
+        //Bridge for raw mo0use laser data
         void addMouseDelta(float dx, float dy);
+
+        // The 1-line building tool
+        void addCube(float px, float py, float pz, float sx, float sy, float sz);
+        void loadTestLevel();
 
         private:
         void* m_device; // id<MTLDevice>
@@ -55,6 +62,10 @@ namespace vuron
         // Trackers for how far the mouse moved in the frame
         float m_mouseDeltaX = 0.0f;
         float m_mouseDeltaY = 0.0f;
+
+        // The dynamic, infinitely scalable list of world geometry (dash)
+        std::vector<vuron::Transform> m_cubes;
+        bool m_levelLoaded = false; // Ensures level spawns only once
 
     };
 }

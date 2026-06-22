@@ -66,6 +66,36 @@ namespace vuron {
         m_mouseDeltaY += dy;
     }
 
+    // ==========================================
+    // -= LEvel BUIlding Tools =-
+    // ==========================================
+    void MetalRenderer::addCube(float px, float py, float pz, float sx, float sy, float sz) {
+        vuron::Transform t;
+        t.position = {px, py, pz};
+        t.rotation = {0.0f, 0.0f, 0.0f};
+        t.scale = {sx, sy, sz};
+        m_cubes.push_back(t);
+    }
+
+    void MetalRenderer::loadTestLevel() {
+        // We MUST spawn the 3 spinning cubes here. They sit at indices 0, 1, & 2
+        addCube(0.0f, 0.0f, 0.0f,  1.0f, 1.0f, 1.0f); // Cube 0
+        addCube(-2.0f, 0.0f, 0.0f,  1.0f, 1.0f, 1.0f); // Cube 1
+        addCube(2.0f, 0.0f, 0.0f,  0.5f, 0.5f, 0.5f); // Cube 2 (shrunk)
+
+        // The massive floor
+        addCube(0.0f, -2.5f, 0.0f, 100.0f, 0.5f, 100.0f);
+
+        // The staircase
+        addCube(0.0f, -2.0f, 4.0f,  3.0f, 1.0f, 1.0f);
+        addCube(0.0f, -1.5f, 6.0f,  3.0f, 1.0f, 1.0f);
+        addCube(0.0f, -1.0f, 8.0f,  3.0f, 1.0f, 1.0f);
+        addCube(0.0f, -0.5f, 10.0f, 3.0f, 1.0f, 1.0f);
+        addCube(0.0f, 0.0f, 12.0f, 3.0f, 1.0f, 1.0f);
+        addCube(0.0f, 0.5f, 14.0f, 3.0f, 1.0f, 1.0f);
+
+    }
+
     bool MetalRenderer::init(void* windowHandle) {
       if (!windowHandle) return false;
       NSWindow* window = (NSWindow*)windowHandle;
@@ -296,47 +326,59 @@ namespace vuron {
         //---------------------
 
         // 2. Defining the entities(just saw the backrooms movie, ts wasn't really scary)
-        vuron::Transform cubes[8];
+//         vuron::Transform cubes[8];
+//
+//         // --Original tumbling cubes--
+//         // Cube 0 - Dead center, standard tumble
+//         cubes[0].position = {0.0f, 0.0f, 0.0f};
+//         cubes[0].rotation = {angle, angle * 0.7f, 0.0f};
+//
+//         // Cube 1 - Shifted left, spinning on Z and Y
+//         cubes[1].position = {-2.0f, 0.0f, 0.0f};
+//         cubes[1].rotation = {0.0f, angle, angle * 0.5f};
+//
+//         // Cube 2 - Shifted right, tumbling fast, and shrunk in half
+//         cubes[2].position = {2.0f, 0.0f, 0.0f};
+//         cubes[2].rotation = {angle * 2.0f, angle * 2.0f, 0.0f};
+//         cubes[2].scale = {0.5f, 0.5f, 0.5f};
+//         //----------------------------------
+//
+//         // The solid floor (index 3)
+//         cubes[3].position = {0.0f, -2.5f, 0.0f};
+//         cubes[3].rotation = {0.0f, 0.0f, 0.0f};
+//         cubes[3].scale = {100.0f, 0.5f, 100.0f};
+//
+//         // The Staircase Ramp (indices 4, 5)
+//         // Placed directly behind the center spinning cube
+//         cubes[4].position = {0.0f, -1.75f, 4.0f};
+//         cubes[4].rotation = {0.0f, 0.0f, 0.0f};
+//         cubes[4].scale = {2.0f, 0.25f, 1.0f}; // First step
+//
+//         cubes[5].position = {0.0f, -1.25f, 6.0f};
+//         cubes[5].rotation = {0.0f, 0.0f, 0.0f};
+//         cubes[5].scale = {2.0f, 0.75f, 1.0f}; // Second, higher step
+//
+//         // Third step
+//         cubes[6].position = {0.0f, -0.75f, 8.0f};
+//         cubes[6].rotation = {0.0f, 0.0f, 0.0f};
+//         cubes[6].scale = {2.0f, 1.25f, 1.0f};
+//
+//         // Fourth step
+//         cubes[7].position = {0.0f, -0.25f, 10.0f};
+//         cubes[7].rotation = {0.0f, 0.0f, 0.0f};
+//         cubes[7].scale = {2.0f, 1.75f, 1.0f};
 
-        // --Original tumbling cubes--
-        // Cube 0 - Dead center, standard tumble
-        cubes[0].position = {0.0f, 0.0f, 0.0f};
-        cubes[0].rotation = {angle, angle * 0.7f, 0.0f};
+        // 1. Initialize the level (Only runs on the very first frame)
+        if (!m_levelLoaded) {
+            loadTestLevel();
+            m_levelLoaded = true;
+        }
 
-        // Cube 1 - Shifted left, spinning on Z and Y
-        cubes[1].position = {-2.0f, 0.0f, 0.0f};
-        cubes[1].rotation = {0.0f, angle, angle * 0.5f};
-
-        // Cube 2 - Shifted right, tumbling fast, and shrunk in half
-        cubes[2].position = {2.0f, 0.0f, 0.0f};
-        cubes[2].rotation = {angle * 2.0f, angle * 2.0f, 0.0f};
-        cubes[2].scale = {0.5f, 0.5f, 0.5f};
-        //----------------------------------
-
-        // The solid floor (index 3)
-        cubes[3].position = {0.0f, -2.5f, 0.0f};
-        cubes[3].rotation = {0.0f, 0.0f, 0.0f};
-        cubes[3].scale = {100.0f, 0.5f, 100.0f};
-
-        // The Staircase Ramp (indices 4, 5)
-        // Placed directly behind the center spinning cube
-        cubes[4].position = {0.0f, -1.75f, 4.0f};
-        cubes[4].rotation = {0.0f, 0.0f, 0.0f};
-        cubes[4].scale = {2.0f, 0.25f, 1.0f}; // First step
-
-        cubes[5].position = {0.0f, -1.25f, 6.0f};
-        cubes[5].rotation = {0.0f, 0.0f, 0.0f};
-        cubes[5].scale = {2.0f, 0.75f, 1.0f}; // Second, higher step
-
-        // Third step
-        cubes[6].position = {0.0f, -0.75f, 8.0f};
-        cubes[6].rotation = {0.0f, 0.0f, 0.0f};
-        cubes[6].scale = {2.0f, 1.25f, 1.0f};
-
-        // Fourth step
-        cubes[7].position = {0.0f, -0.25f, 10.0f};
-        cubes[7].rotation = {0.0f, 0.0f, 0.0f};
-        cubes[7].scale = {2.0f, 1.75f, 1.0f};
+        // 2. Update Geometry (dash) (2.2 when??)
+        // We manually spin the first 3 cubes in our list
+        m_cubes[0].rotation = {angle, angle * 0.7f, 0.0f};
+        m_cubes[1].rotation = {0.0f, angle, angle * 0.5f};
+        m_cubes[2].rotation = {angle * 2.0f, angle * 2.0f, 0.0f};
 
         // ===============================================
         // -= Unified Physics and Movement Engine =-
@@ -367,8 +409,8 @@ namespace vuron {
             };
 
             bool ceilingClear = true;
-            for (int i = 0; i < 8; ++i) {
-                if (vuron::AABB::checkCollision(ghostBox, cubes[i].getHitbox())) {
+            for (size_t i = 0; i < m_cubes.size(); ++i) {
+                if (vuron::AABB::checkCollision(ghostBox, m_cubes[i].getHitbox())) {
                     ceilingClear = false; // Head hit something. Stay crouched
                     break;
                 }
@@ -394,8 +436,8 @@ namespace vuron {
 
         // 2. X-axis collision (Move, check, revert if hit)
         camera.position.x += moveX;
-        for (int i = 0; i < 8; ++i) {
-            if (vuron::AABB::checkCollision(camera.getHitbox(), cubes[i].getHitbox())) {
+        for (size_t i = 0; i < m_cubes.size(); ++i) {
+            if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox())) {
                 camera.position.x -= moveX; // Wall hit. Slide along it instead
                 break;
             }
@@ -403,8 +445,8 @@ namespace vuron {
 
         // 3. Z-axis collision (move, check, revert if hit)
         camera.position.z += moveZ;
-        for (int i = 0; i < 8; ++i) {
-            if (vuron::AABB::checkCollision(camera.getHitbox(), cubes[i].getHitbox())) {
+        for (size_t i = 0; i < m_cubes.size(); ++i) {
+            if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox())) {
                 camera.position.z -= moveZ; // Wall hit
                 break;
             }
@@ -434,8 +476,8 @@ namespace vuron {
         bool grounded = false; // The engine must prove we are standing on something
 
         // 3. Collision detection
-        for (int i = 0; i < 8; ++i) {
-            vuron::AABB cubeBox = cubes[i].getHitbox();
+        for (size_t i = 0; i < m_cubes.size(); ++i) {
+            vuron::AABB cubeBox = m_cubes[i].getHitbox();
             if (vuron::AABB::checkCollision(camera.getHitbox(), cubeBox)) {
 
                 // Falling down into a surface (floor)
@@ -482,10 +524,10 @@ namespace vuron {
         [encoder setDepthStencilState:(id<MTLDepthStencilState>)m_depthStencilState];
 
         // 4. The Rendering loop (every entity drawn independently)
-        for (int i = 0; i < 8; ++i) {
+        for (size_t i = 0; i < m_cubes.size(); ++i) {
 
             // Calculate this specific cube's final matrix
-            vuron::Matrix4x4 modelMatrix = cubes[i].getModelMatrix();
+            vuron::Matrix4x4 modelMatrix = m_cubes[i].getModelMatrix();
             vuron::Matrix4x4 mvpMatrix = modelMatrix * viewMatrix * projectionMatrix;
 
             // Inject the matrix directly into GPU Register slot 1
