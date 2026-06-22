@@ -158,6 +158,16 @@ namespace vuron
             handled = true;
         }
         // --------------------------
+
+        // --Modifier Key Intercept-- (Shift key)
+        else if (event.type == NSEventTypeFlagsChanged) {
+            // Check if the shift key is pressed
+            bool isShift = ([event modifierFlags] & NSEventModifierFlagShift) != 0;
+
+            // We pass 'C' to represent Crouch in our engine's input bridge
+            m_renderer->setKeyState('C', isShift);
+            handled = true;
+        }
         // Send the event to the OS to handle basic events like moving the window
         // Only send the event to the OS if Vuron didn't need it
         if (!handled) {

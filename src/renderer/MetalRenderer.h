@@ -42,6 +42,8 @@ namespace vuron
 
         //Space key for jumping
         bool m_keySpace = false;
+        // Shift key for crouching
+        bool m_keyShift = false;
 
         // SOCD (Last-Win) axis trackers
         char m_activeX = 0;

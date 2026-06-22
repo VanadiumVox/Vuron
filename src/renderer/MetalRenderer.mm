@@ -52,6 +52,11 @@ namespace vuron {
                 m_hasJumped = false;
             }
         }
+
+        // Crouch logic
+        if (key == 'C') {
+            m_keyShift = isPressed;
+        }
     }
     // ---------------------------------------------------------
 
@@ -343,6 +348,40 @@ namespace vuron {
         float rightX = std::cos(camera.yaw);
         float rightZ = -std::sin(camera.yaw);
 
+        // -=Crouching and Anti-clip Logic=-
+        bool wantCrouch = m_keyShift;
+
+        if (wantCrouch && !camera.isCrouched) {
+            // Initiate crouch
+            camera.isCrouched = true;
+            // Shift eyes down by 1 unit. Because hitbox moves down by 1.0,
+            // The feet remain in the exact same physical location
+            camera.position.y -= 0.5f;
+        }
+        else if (!wantCrouch && camera.isCrouched) {
+            // Attempt uncrouch (anti-clip check)
+            // We project a "Ghost box" representing what the player's hitbox would look like standing
+            vuron::AABB ghostBox = {
+                {camera.position.x - 0.5f, (camera.position.y + 0.5f) - 2.0f, camera.position.z - 0.5f},
+                {camera.position.x + 0.5f, (camera.position.y + 0.5f) + 0.2f, camera.position.z + 0.5f}
+            };
+
+            bool ceilingClear = true;
+            for (int i = 0; i < 8; ++i) {
+                if (vuron::AABB::checkCollision(ghostBox, cubes[i].getHitbox())) {
+                    ceilingClear = false; // Head hit something. Stay crouched
+                    break;
+                }
+            }
+
+            if (ceilingClear) {
+                // Execute Uncrouch
+                camera.isCrouched = false;
+                camera.position.y += 0.5f; // Raise the eyes back up
+            }
+        }
+        // --------------------------------
+
         // 1. Calculate intended horizontal movement
         float moveX = 0.0f;
         float moveZ = 0.0f;
@@ -401,9 +440,10 @@ namespace vuron {
 
                 // Falling down into a surface (floor)
                 if (camera.velocityY < 0.0f) {
+                    float currentHeight = camera.isCrouched ? 1.5f : 2.0f;
                     // Snap the player's feet perfectly to the top of the cube
                     // +0.001f to prevent floating-point glitching
-                    camera.position.y = cubeBox.max.y + 2.001f;
+                    camera.position.y = cubeBox.max.y + currentHeight + 0.001f;
                     camera.velocityY = 0.0f;
                     grounded = true;
                 }

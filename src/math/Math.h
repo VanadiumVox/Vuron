@@ -221,10 +221,12 @@ namespace vuron
         // Tracks vertical momentum
         float velocityY = 0.0f;
 
+        bool isCrouched = false;
+
         // The Player's hitbox
         AABB getHitbox() const {
             float radius = 0.5f; // How FAt the player is
-            float height = 2.0f; // How tall the character is
+            float height = isCrouched ? 1.5f : 2.0f; // How tall the character is
 
             // The camera position is at the player's eye-level
             // So the feet (min.y) are 'height' units below the eyes
