@@ -3,6 +3,7 @@
 #import <QuartzCore/CAMetalLayer.h>
 #import <Appkit/NSWindow.h>
 #import <AppKit/NSView.h>
+#import <AppKit/AppKit.h>
 #include <iostream>
 #include "../math/Math.h"
 
@@ -599,6 +600,71 @@ namespace vuron {
             }
         }
         // ================================================
+
+
+        // ===========================================
+        // -- 5. Debug Menu --
+        // ===========================================
+        static NSTextField* debugLabel = nil;
+
+        // 1. Capture the exact variables we need
+        bool showMenu = m_showDebugMenu;
+        float px = camera.position.x;
+        float py = camera.position.y;
+        float pz = camera.position.z;
+        float currentSpeed = m_currentMomentum;
+        bool isAccel = m_isAccelerating;
+
+        // 2. Throw the UI drawing logic over to the main thread
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (showMenu) {
+                // Lazy Initialization
+                if (!debugLabel) {
+                    NSWindow *window = [NSApp mainWindow];
+                    if (!window) window = [NSApp keyWindow]; // Fallback if mainWindow isn't set yet
+                    if (window) {
+                        NSView*mainView = window.contentView;
+                        debugLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(16, mainView.bounds.size.height - 120, 400, 100)];
+                        [debugLabel setEditable:NO];
+                        [debugLabel setSelectable:NO];
+                        [debugLabel setDrawsBackground:NO];
+                        [debugLabel setBordered:NO];
+                        [debugLabel setWantsLayer:YES];
+                        [debugLabel setAutoresizingMask:NSViewMaxXMargin | NSViewMinYMargin];
+                        [mainView addSubview:debugLabel];
+                    }
+                }
+
+                if (debugLabel) {
+                    [debugLabel setHidden:NO];
+
+                    // BUild the core text block
+                    NSString *text = [NSString stringWithFormat:@"X: %.2f\nY: %.2f\nZ: %.2f\nSpeed: %.3f\nAccel: ",
+                                      camera.position.x, camera.position.y, camera.position.z, m_currentMomentum];
+
+                    NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:text];
+                    [attrStr addAttribute:NSForegroundColorAttributeName value:[NSColor whiteColor] range:NSMakeRange(0, text.length)];
+                    [attrStr addAttribute:NSFontAttributeName value:[NSFont fontWithName:@"Menlo" size:14.0f] range:NSMakeRange(0, text.length)];
+
+                    // Color-code Acceleration
+                    NSString *stateText = m_isAccelerating ? @"ON" : @"OFF";
+                    NSColor * stateColor = m_isAccelerating ? [NSColor greenColor] : [NSColor redColor];
+
+                    NSAttributedString *stateStr = [[NSAttributedString alloc] initWithString:stateText
+                        attributes:@{NSForegroundColorAttributeName: stateColor, NSFontAttributeName: [NSFont fontWithName:@"Menlo-Bold" size:14.0f]}];
+
+                    [attrStr appendAttributedString:stateStr];
+                    [debugLabel setAttributedStringValue:attrStr];
+                }
+            } else {
+                // Instantly hide overlay if turned off
+                if (debugLabel) {
+                    [debugLabel setHidden:YES];
+                }
+            }
+        });
+
+
 
         // Grab the inverse matrix to physically shift the universe around the player
         vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();

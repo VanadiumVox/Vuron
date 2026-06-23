@@ -30,6 +30,9 @@ namespace vuron
         void addCube(float px, float py, float pz, float sx, float sy, float sz);
         void loadTestLevel();
 
+        // Debug menu toggle
+        void toggleDebugMenu() { m_showDebugMenu = !m_showDebugMenu; }
+
         private:
         void* m_device; // id<MTLDevice>
         void* m_commandQueue; // id<MTLCommandQueue>
@@ -72,6 +75,9 @@ namespace vuron
         // The dynamic, infinitely scalable list of world geometry (dash)
         std::vector<vuron::Transform> m_cubes;
         bool m_levelLoaded = false; // Ensures level spawns only once
+
+        // Tracks the 'ctrl + v' state
+        bool m_showDebugMenu = false;
 
     };
 }

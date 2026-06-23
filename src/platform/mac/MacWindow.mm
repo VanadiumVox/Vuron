@@ -139,6 +139,11 @@ namespace vuron
             if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', true); handled = true;}
             if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', true); handled = true;}
             if ([chars isEqualToString:@"r"]) {m_renderer->setKeyState('r', true); handled = true;}
+            NSString *unmodifiedChars = [[event charactersIgnoringModifiers] lowercaseString];
+            if ([unmodifiedChars isEqualToString:@"v"] && ([event modifierFlags] & NSEventModifierFlagControl)) {
+                m_renderer->toggleDebugMenu();
+                handled = true;
+            }
         }
         // When the key is released, stop movement instantly
         else if (event.type == NSEventTypeKeyUp) {
