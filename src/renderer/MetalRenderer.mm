@@ -102,6 +102,8 @@ namespace vuron {
         addCube(0.0f, 0.0f, 12.0f, 3.0f, 1.0f, 1.0f);
         addCube(0.0f, 0.5f, 14.0f, 3.0f, 1.0f, 1.0f);
 
+        addCube (0.0f, -2.5f, 550.0f,  15.0f, 0.5f, 1000.0f);
+
     }
 
     bool MetalRenderer::init(void* windowHandle) {

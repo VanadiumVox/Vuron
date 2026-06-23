@@ -189,8 +189,16 @@ namespace vuron
         AABB getHitbox() const {
             // Assuming out base 3D cube model is exactly 2x2x2 units large
             return {
-                {position.x - scale.x, position.y - scale.y, position.z - scale.z},
-                {position.x + scale.x, position.y + scale.y, position.z + scale.z}
+                {
+                    position.x - (scale.x * 0.5f),
+                    position.y - (scale.y * 0.5f),
+                    position.z - (scale.z * 0.5f)
+                },
+                {
+                    position.x + (scale.x * 0.5f),
+                    position.y + (scale.y * 0.5f),
+                    position.z + (scale.z * 0.5f)
+                }
             };
         }
 
