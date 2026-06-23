@@ -84,6 +84,11 @@ namespace vuron
         char m_lastWavedashKeyX = 0;
         char m_lastWavedashKeyZ = 0;
 
+        // Long jump trackers
+        int m_boostHangTimer = 0;
+        bool m_isBoosting = false;
+        int m_jumpBuffer = 0;
+
     };
 }
 

@@ -379,9 +379,22 @@ namespace vuron {
 //         cubes[7].rotation = {0.0f, 0.0f, 0.0f};
 //         cubes[7].scale = {2.0f, 1.75f, 1.0f};
 
-        if (m_wavedashWindow > 0) {
-            m_wavedashWindow--;
+
+        // --= Tick Combo Timers =--
+        if (m_wavedashWindow > 0) m_wavedashWindow--;
+        if (m_jumpBuffer > 0) m_jumpBuffer--;
+
+
+        // Tick the long jump hang time (approx 30 frames = 0.5s)
+        if (m_boostHangTimer > 0)
+        {
+            m_boostHangTimer--;
+            if (m_boostHangTimer == 0)
+            {
+                m_isBoosting = true; // Hang time is over, trigger decay
+            }
         }
+        // --------------------------
 
         // Initialize the level (Only runs on the very first frame)
         if (!m_levelLoaded) {
@@ -437,7 +450,7 @@ namespace vuron {
                         m_currentMomentum = 0.1f;
                     }
 
-                    // Refresh the combo timer (approx 25 frames to execute the next crouch)
+                    // Refresh the combo timer (approx 15 frames to execute the next crouch)
                     m_wavedashWindow = 15;
 
                     // Save current direction for the next dash check
@@ -478,6 +491,18 @@ namespace vuron {
 
         bool isMoving = (m_activeX != 0 || m_activeZ != 0);
 
+        // --- Long Jump decay phase ---
+        if (m_isBoosting) {
+            m_currentMomentum -= 0.015f; // Hemorrhaging speed here
+
+            // Once it drops to 0.35f, the decay ends
+            if (m_currentMomentum <= 0.35f) {
+                m_currentMomentum = 0.35f;
+                m_isBoosting = false;
+            }
+        }
+
+        // --- Standard Coasting and Acceleration ---
         if (!isMoving) {
             // Player let go of the keyboard
             // Auto-cancel the toggle and kill momentum
@@ -493,6 +518,7 @@ namespace vuron {
                 }
             }
         }
+        // -------------------------------------------
 
         // Hard cap safety net
         // Ensures the tech never breaks (hopefully)
@@ -575,12 +601,15 @@ namespace vuron {
         yHitbox.min.z += 0.05f; yHitbox.max.z -= 0.05f;
 
         // 3. Collision detection
-        for (size_t i = 0; i < m_cubes.size(); ++i) {
+        for (size_t i = 0; i < m_cubes.size(); ++i)
+        {
             vuron::AABB cubeBox = m_cubes[i].getHitbox();
-            if (vuron::AABB::checkCollision(yHitbox, cubeBox)) {
+            if (vuron::AABB::checkCollision(yHitbox, cubeBox))
+            {
 
                 // Falling down into a surface (floor)
-                if (camera.velocityY < 0.0f) {
+                if (camera.velocityY < 0.0f)
+                {
                     float currentHeight = camera.isCrouched ? 1.5f : 2.0f;
                     // Snap the player's feet perfectly to the top of the cube
                     // +0.001f to prevent floating-point glitching
@@ -590,7 +619,8 @@ namespace vuron {
                     camera.crouchedMidAir = false; // Reset midair strict lock when landing
                 }
                 // Jumping into a surface (ceiling)
-                else if (camera.velocityY > 0.0f) {
+                else if (camera.velocityY > 0.0f)
+                {
                     // Snap player head to the bottom of the cube
                     camera.position.y = cubeBox.min.y - 0.201f;
                     camera.velocityY = 0.0f;
@@ -599,17 +629,44 @@ namespace vuron {
             }
         }
 
+        // ================================================
         // 4. Jump Execution (Relying purely on Geometrical physics)
-        if (camera.isGrounded) {
+        // ================================================
+
+        // Always reset the physical key lock if the player let go of space
+        if (!m_keySpace)
+        {
+            m_hasJumped = false;
+        }
+
+        // --- Rocket Jumping ---
+        if (camera.isGrounded)
+        {
             m_hasRocketJumped = false; // Reset the moment the feet touch the floor
 
-            if (m_keySpace && !m_hasJumped) {
+            if ((m_keySpace && !m_hasJumped) || m_jumpBuffer > 0)
+            {
+                // --- Boost Boots (Long Jump) ---
+                bool isMoving = (m_activeX != 0 || m_activeZ != 0);
+                if (camera.isCrouched && isMoving)
+                {
+                    m_currentMomentum = 0.75f; // The velocity spike
+                    m_boostHangTimer = 30;     // 30 frames of hang time
+                    m_isBoosting = false;      // Ensure decay is off
+
+                    // Force the player to stand up to prevent hitbox snagging during takeoff
+                    camera.isCrouched = false;
+                    camera.position.y += 0.5f;
+                }
+
                 camera.velocityY = jumpForce;
                 m_hasJumped = true;
+                m_jumpBuffer = 0; // Consume the buffer so no double trigger
             }
         } else {
             // -- Mid-air Logic --
-            if (m_keySpace && !m_hasJumped) {
+            if (m_keySpace && !m_hasJumped)
+            {
                 // The player released and presses space again in midair
                 float peakWindow = 0.08f; // How forgiving the apex timing is
                 float rocketForce = 0.45f; // 3x the standard jump height
@@ -619,15 +676,19 @@ namespace vuron {
                 // Condition 3: Have they not already RJumped?
                 // Condition 4: Is their vertical velocity floating around 0.0f?
                 if (camera.isCrouched && camera.crouchedMidAir && !m_hasRocketJumped &&
-                    camera.velocityY <= peakWindow && camera.velocityY >= -peakWindow) {
+                    camera.velocityY <= peakWindow && camera.velocityY >= -peakWindow)
+                    {
                         // Kaboom.
                         camera.velocityY = rocketForce;
                         m_hasRocketJumped = true; // Locking RJump
+                        m_hasJumped = true;
+                    }
+                else
+                {
+                    // They missed the rocket jump
+                    m_jumpBuffer = 10; // 10 frames ~ 0.166s
+                    m_hasJumped = true; // Lock further midair inputs
                 }
-
-                m_hasJumped = true; // Re-lock the spacebar
-            } else if (m_keySpace) {
-                m_hasJumped = true; // Standard anti-buffer catch all
             }
         }
         // ================================================
