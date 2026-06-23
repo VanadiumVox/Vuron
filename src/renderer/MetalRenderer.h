@@ -79,6 +79,11 @@ namespace vuron
         // Tracks the 'ctrl + v' state
         bool m_showDebugMenu = false;
 
+        // Wavedash trackers
+        int m_wavedashWindow = 0;
+        char m_lastWavedashKeyX = 0;
+        char m_lastWavedashKeyZ = 0;
+
     };
 }
 

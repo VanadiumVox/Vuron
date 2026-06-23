@@ -379,6 +379,10 @@ namespace vuron {
 //         cubes[7].rotation = {0.0f, 0.0f, 0.0f};
 //         cubes[7].scale = {2.0f, 1.75f, 1.0f};
 
+        if (m_wavedashWindow > 0) {
+            m_wavedashWindow--;
+        }
+
         // Initialize the level (Only runs on the very first frame)
         if (!m_levelLoaded) {
             loadTestLevel();
@@ -413,6 +417,33 @@ namespace vuron {
             // Strict Rocket Lock: Only allow if crouching started midair
             if (!camera.isGrounded) {
                 camera.crouchedMidAir = true;
+            } else {
+                // --= Wavedash Combo Logic =--
+                bool isMoving = (m_activeX != 0 || m_activeZ != 0);
+
+                if (isMoving) {
+
+                    //Did they maintain the same directional input?
+                    if (m_activeX == m_lastWavedashKeyX && m_activeZ == m_lastWavedashKeyZ) {
+
+                        // Is the combo timer still alive?
+                        if (m_wavedashWindow > 0) {
+                            m_currentMomentum += 0.05f; // The wavedash burst
+                            float wavedashCap = 0.5f; // Wavedash soft cap
+                            if (m_currentMomentum > wavedashCap) m_currentMomentum = wavedashCap;
+                        }
+                    } else {
+                        // The penalty; they pressed shift while changing directions on the ground
+                        m_currentMomentum = 0.1f;
+                    }
+
+                    // Refresh the combo timer (approx 25 frames to execute the next crouch)
+                    m_wavedashWindow = 15;
+
+                    // Save current direction for the next dash check
+                    m_lastWavedashKeyX = m_activeX;
+                    m_lastWavedashKeyZ = m_activeZ;
+                }
             }
         }
         else if (!wantCrouch && camera.isCrouched) {
@@ -443,7 +474,7 @@ namespace vuron {
         float baseSpeed = 0.1f;
         float sprintCap = 0.5f; // Soft speed cap
         float absoluteCeiling = 1.0f; // Hard speed cap
-        float acceleration = 0.003f;
+        float acceleration = 0.0025f;
 
         bool isMoving = (m_activeX != 0 || m_activeZ != 0);
 
