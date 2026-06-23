@@ -54,7 +54,8 @@ namespace vuron
         // R for Sprinting
         bool m_keyR = false;
 
-        bool m_isRunning = false; // Tracks the toggle state
+        bool m_isAccelerating = false; // Tracks the toggle state
+        float m_currentMomentum = 0.01f; // The player's momentum
 
         // SOCD (Last-Win) axis trackers
         char m_activeX = 0;

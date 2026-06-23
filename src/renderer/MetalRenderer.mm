@@ -58,13 +58,12 @@ namespace vuron {
             m_keyShift = isPressed;
         }
 
-        // Run toggle logic
+        // Acceleration toggle logic
         if (key == 'r') {
             if (isPressed && !m_keyR) {
-                // Flip the running state when pressed
-                m_isRunning = !m_isRunning;
+                m_isAccelerating = !m_isAccelerating; // Flip the switch
             }
-            m_keyR = isPressed; // Save the raw held state
+            m_keyR = isPressed;
         }
     }
     // ---------------------------------------------------------
@@ -377,13 +376,13 @@ namespace vuron {
 //         cubes[7].rotation = {0.0f, 0.0f, 0.0f};
 //         cubes[7].scale = {2.0f, 1.75f, 1.0f};
 
-        // 1. Initialize the level (Only runs on the very first frame)
+        // Initialize the level (Only runs on the very first frame)
         if (!m_levelLoaded) {
             loadTestLevel();
             m_levelLoaded = true;
         }
 
-        // 2. Update Geometry (dash) (2.2 when??)
+        // Update Geometry (dash) (2.2 when??)
         // We manually spin the first 3 cubes in our list
         m_cubes[0].rotation = {angle, angle * 0.7f, 0.0f};
         m_cubes[1].rotation = {0.0f, angle, angle * 0.5f};
@@ -438,15 +437,34 @@ namespace vuron {
         // --------------------------------
 
         // 1. Calculate intended horizontal movement
+        float baseSpeed = 0.1f;
+        float sprintCap = 0.5f; // Soft speed cap
+        float absoluteCeiling = 1.0f; // Hard speed cap
+        float acceleration = 0.003f;
 
-        // Auto cancel the sprint if the player stops touching WASD
-        if (m_activeX == 0 && m_activeZ == 0) {
-            m_isRunning = false;
+        bool isMoving = (m_activeX != 0 || m_activeZ != 0);
+
+        if (!isMoving) {
+            // Player let go of the keyboard
+            // Auto-cancel the toggle and kill momentum
+            m_isAccelerating = false;
+            m_currentMomentum = baseSpeed;
+        } else {
+            // Player is actively moving
+            if (m_isAccelerating) {
+                // Only accelerate below the soft cap
+                if (m_currentMomentum < sprintCap) {
+                    m_currentMomentum += acceleration;
+                    if (m_currentMomentum > sprintCap) m_currentMomentum = sprintCap;
+                }
+            }
         }
 
-        float baseSpeed = 0.1f;
-        float runSpeed = 0.22f; // Over double the speed
-        float currentSpeed = m_isRunning ? runSpeed : baseSpeed;
+        // Hard cap safety net
+        // Ensures the tech never breaks (hopefully)
+        if (m_currentMomentum > absoluteCeiling) {
+            m_currentMomentum = absoluteCeiling;
+        }
 
         // Get raw directional inputs (-1, 0, or 1)
         float inputX = 0.0f;
@@ -466,14 +484,15 @@ namespace vuron {
         }
 
         // Apply Trigonometry based on where the camera is looking
-        float moveX = (inputZ * fwdX + inputX * rightX) * currentSpeed;
-        float moveZ = (inputZ * fwdZ + inputX * rightZ) * currentSpeed;
+        float moveX = (inputZ * fwdX + inputX * rightX) * m_currentMomentum;
+        float moveZ = (inputZ * fwdZ + inputX * rightZ) * m_currentMomentum;
 
         // 2. X-axis collision (Move, check, revert if hit)
         camera.position.x += moveX;
         for (size_t i = 0; i < m_cubes.size(); ++i) {
             if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox())) {
                 camera.position.x -= moveX; // Wall hit. Slide along it instead
+                m_currentMomentum = baseSpeed; // Wall slam penalty
                 break;
             }
         }
@@ -483,6 +502,7 @@ namespace vuron {
         for (size_t i = 0; i < m_cubes.size(); ++i) {
             if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox())) {
                 camera.position.z -= moveZ; // Wall hit
+                m_currentMomentum = baseSpeed;// Wall slam penalty
                 break;
             }
         }
@@ -516,10 +536,14 @@ namespace vuron {
 
         camera.isGrounded = false; // Reset the grounded state every frame to force proof
 
+        vuron::AABB yHitbox = camera.getHitbox();
+        yHitbox.min.x += 0.05f; yHitbox.max.x -= 0.05f;
+        yHitbox.min.z += 0.05f; yHitbox.max.z -= 0.05f;
+
         // 3. Collision detection
         for (size_t i = 0; i < m_cubes.size(); ++i) {
             vuron::AABB cubeBox = m_cubes[i].getHitbox();
-            if (vuron::AABB::checkCollision(camera.getHitbox(), cubeBox)) {
+            if (vuron::AABB::checkCollision(yHitbox, cubeBox)) {
 
                 // Falling down into a surface (floor)
                 if (camera.velocityY < 0.0f) {
@@ -541,7 +565,7 @@ namespace vuron {
             }
         }
 
-        // 5. Jump Execution (Relying purely on Geometrical physics)
+        // 4. Jump Execution (Relying purely on Geometrical physics)
         if (camera.isGrounded) {
             m_hasRocketJumped = false; // Reset the moment the feet touch the floor
 
