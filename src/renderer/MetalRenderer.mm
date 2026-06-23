@@ -57,6 +57,15 @@ namespace vuron {
         if (key == 'C') {
             m_keyShift = isPressed;
         }
+
+        // Run toggle logic
+        if (key == 'r') {
+            if (isPressed && !m_keyR) {
+                // Flip the running state when pressed
+                m_isRunning = !m_isRunning;
+            }
+            m_keyR = isPressed; // Save the raw held state
+        }
     }
     // ---------------------------------------------------------
 
@@ -399,6 +408,10 @@ namespace vuron {
             // Shift eyes down by 1 unit. Because hitbox moves down by 1.0,
             // The feet remain in the exact same physical location
             camera.position.y -= 0.5f;
+            // Strict Rocket Lock: Only allow if crouching started midair
+            if (!camera.isGrounded) {
+                camera.crouchedMidAir = true;
+            }
         }
         else if (!wantCrouch && camera.isCrouched) {
             // Attempt uncrouch (anti-clip check)
@@ -425,14 +438,36 @@ namespace vuron {
         // --------------------------------
 
         // 1. Calculate intended horizontal movement
-        float moveX = 0.0f;
-        float moveZ = 0.0f;
 
-        if (m_activeZ == 'w') { moveX += fwdX * speed; moveZ += fwdZ * speed; }
-        else if (m_activeZ == 's') { moveX -= fwdX * speed; moveZ -= fwdZ * speed; }
+        // Auto cancel the sprint if the player stops touching WASD
+        if (m_activeX == 0 && m_activeZ == 0) {
+            m_isRunning = false;
+        }
 
-        if (m_activeX == 'd') { moveX += rightX * speed; moveZ += rightZ * speed; }
-        else if (m_activeX == 'a') { moveX -= rightX * speed; moveZ -= rightZ * speed; }
+        float baseSpeed = 0.1f;
+        float runSpeed = 0.22f; // Over double the speed
+        float currentSpeed = m_isRunning ? runSpeed : baseSpeed;
+
+        // Get raw directional inputs (-1, 0, or 1)
+        float inputX = 0.0f;
+        float inputZ = 0.0f;
+
+        if (m_activeZ == 'w') inputZ = 1.0f;
+        else if (m_activeZ == 's') inputZ = -1.0f;
+
+        if (m_activeX == 'd') inputX = 1.0f;
+        else if (m_activeX == 'a') inputX = -1.0f;
+
+        // Vector Normalization (fix for the hypotenuse bug)
+        float inputMag = std::sqrt(inputX * inputX + inputZ * inputZ);
+        if (inputMag > 0.0f) {
+            inputX /= inputMag;
+            inputZ /= inputMag;
+        }
+
+        // Apply Trigonometry based on where the camera is looking
+        float moveX = (inputZ * fwdX + inputX * rightX) * currentSpeed;
+        float moveZ = (inputZ * fwdZ + inputX * rightZ) * currentSpeed;
 
         // 2. X-axis collision (Move, check, revert if hit)
         camera.position.x += moveX;
@@ -457,12 +492,17 @@ namespace vuron {
         float floatGravity = -0.002f; // Slowed fall while holding space
         float heavyGravity = -0.02f; // Aggressive falling cutting a jump short
         float jumpForce = 0.15f; // The upward burst
+        float fastFallGravity = -0.025f; // Pulls you down when holding crouch
 
         float currentGravity = baseGravity;
         // Dynamic Gravity Calculator
         if (camera.velocityY > 0.0f && !m_keySpace) {
             // Player is moving up, but let go of space early
             currentGravity = heavyGravity;
+        }
+        else if (camera.velocityY < 0.0f && m_keyShift) {
+            // Shift wins over space for fast falling
+            currentGravity = fastFallGravity;
         }
         else if (camera.velocityY < 0.0f && m_keySpace) {
             // Player is falling down, but holding spacebar
@@ -473,7 +513,8 @@ namespace vuron {
         camera.velocityY += currentGravity;
         // 2. Apply the velocity to player's position
         camera.position.y += camera.velocityY;
-        bool grounded = false; // The engine must prove we are standing on something
+
+        camera.isGrounded = false; // Reset the grounded state every frame to force proof
 
         // 3. Collision detection
         for (size_t i = 0; i < m_cubes.size(); ++i) {
@@ -487,7 +528,8 @@ namespace vuron {
                     // +0.001f to prevent floating-point glitching
                     camera.position.y = cubeBox.max.y + currentHeight + 0.001f;
                     camera.velocityY = 0.0f;
-                    grounded = true;
+                    camera.isGrounded = true;
+                    camera.crouchedMidAir = false; // Reset midair strict lock when landing
                 }
                 // Jumping into a surface (ceiling)
                 else if (camera.velocityY > 0.0f) {
@@ -499,14 +541,36 @@ namespace vuron {
             }
         }
 
-        // 4. Jump Execution
-        if (grounded) {
+        // 5. Jump Execution (Relying purely on Geometrical physics)
+        if (camera.isGrounded) {
+            m_hasRocketJumped = false; // Reset the moment the feet touch the floor
+
             if (m_keySpace && !m_hasJumped) {
                 camera.velocityY = jumpForce;
                 m_hasJumped = true;
             }
         } else {
-            if (m_keySpace) m_hasJumped = true; // Anti-buffer
+            // -- Mid-air Logic --
+            if (m_keySpace && !m_hasJumped) {
+                // The player released and presses space again in midair
+                float peakWindow = 0.08f; // How forgiving the apex timing is
+                float rocketForce = 0.45f; // 3x the standard jump height
+
+                // Condition 1: Are they holding Crouch?
+                // Condition 2: Did they Initiate that crouch midair?
+                // Condition 3: Have they not already RJumped?
+                // Condition 4: Is their vertical velocity floating around 0.0f?
+                if (camera.isCrouched && camera.crouchedMidAir && !m_hasRocketJumped &&
+                    camera.velocityY <= peakWindow && camera.velocityY >= -peakWindow) {
+                        // Kaboom.
+                        camera.velocityY = rocketForce;
+                        m_hasRocketJumped = true; // Locking RJump
+                }
+
+                m_hasJumped = true; // Re-lock the spacebar
+            } else if (m_keySpace) {
+                m_hasJumped = true; // Standard anti-buffer catch all
+            }
         }
         // ================================================
 

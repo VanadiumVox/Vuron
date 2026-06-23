@@ -223,6 +223,10 @@ namespace vuron
 
         bool isCrouched = false;
 
+        // Physical state trackers
+        bool isGrounded = false;
+        bool crouchedMidAir = false; // The strict rocket jump lock
+
         // The Player's hitbox
         AABB getHitbox() const {
             float radius = 0.5f; // How FAt the player is

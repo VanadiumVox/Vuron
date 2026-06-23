@@ -51,6 +51,10 @@ namespace vuron
         bool m_keySpace = false;
         // Shift key for crouching
         bool m_keyShift = false;
+        // R for Sprinting
+        bool m_keyR = false;
+
+        bool m_isRunning = false; // Tracks the toggle state
 
         // SOCD (Last-Win) axis trackers
         char m_activeX = 0;
@@ -58,6 +62,7 @@ namespace vuron
 
         // Jump spam prevention lock
         bool m_hasJumped = false;
+        bool m_hasRocketJumped = false; // Locks RJump until you land
 
         // Trackers for how far the mouse moved in the frame
         float m_mouseDeltaX = 0.0f;
