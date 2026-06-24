@@ -6,6 +6,7 @@
 #import <AppKit/AppKit.h>
 #include <iostream>
 #include "../math/Math.h"
+#include "../world/LevelLoader.h"
 
 namespace vuron {
     // Constructor & destructor
@@ -398,7 +399,8 @@ namespace vuron {
 
         // Initialize the level (Only runs on the very first frame)
         if (!m_levelLoaded) {
-            loadTestLevel();
+            // Loading from the text file
+            m_cubes = vuron::LevelLoader::loadLevel("src/levels/test_arena.vlvl");
             m_levelLoaded = true;
         }
 
@@ -654,9 +656,6 @@ namespace vuron {
                     m_boostHangTimer = 30;     // 30 frames of hang time
                     m_isBoosting = false;      // Ensure decay is off
 
-                    // Force the player to stand up to prevent hitbox snagging during takeoff
-                    camera.isCrouched = false;
-                    camera.position.y += 0.5f;
                 }
 
                 camera.velocityY = jumpForce;
@@ -732,7 +731,7 @@ namespace vuron {
 
                     // BUild the core text block
                     NSString *text = [NSString stringWithFormat:@"X: %.2f\nY: %.2f\nZ: %.2f\nSpeed: %.3f\nAccel: ",
-                                      camera.position.x, camera.position.y, camera.position.z, m_currentMomentum];
+                                      px, py, pz, currentSpeed];
 
                     NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:text];
                     [attrStr addAttribute:NSForegroundColorAttributeName value:[NSColor whiteColor] range:NSMakeRange(0, text.length)];
