@@ -25,6 +25,12 @@ namespace vuron
         Vector3 color;
     };
 
+    // -- Vector Math Helpers --
+    inline float dot(const Vector3& a, const Vector3& b)
+    {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
     // An Axis-Aligned Bounding Box (AABB) / Rigid Body
     struct AABB {
         Vector3 min; // Bottom-Left-Back corner
@@ -99,6 +105,17 @@ namespace vuron
         result.m[3][3] = 1.0f;
 
         return result;
+        }
+
+        // Creates a combined XYZ rotation matrix
+        static Matrix4x4 rotation(float rx, float ry, float rz)
+        {
+            Matrix4x4 xMat = rotationX(rx);
+            Matrix4x4 yMat = rotationY(ry);
+            Matrix4x4 zMat = rotationZ(rz);
+
+            // Order matches getModelMatrix() logic
+            return xMat * yMat * zMat;
         }
 
         // Creates a Scaling matrix
@@ -184,6 +201,10 @@ namespace vuron
         Vector3 position = {0.0f, 0.0f, 0.0f};
         Vector3 rotation = {0.0f, 0.0f, 0.0f};
         Vector3 scale = {1.0f, 1.0f, 1.0f};
+
+        // Ramp Data
+        bool isRamp = false;
+        Vector3 normal = {0.0f, 1.0f, 0.0f}; // The direction the slope faces
 
         // Generates a 3D hitbox wrapped around the unrotated cube
         AABB getHitbox() const {

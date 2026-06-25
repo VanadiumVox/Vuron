@@ -485,155 +485,197 @@ namespace vuron {
         }
         // --------------------------------
 
-        // 1. Calculate intended horizontal movement
+        // ==============================================
+        // -= 1. Intended Movement & Directional Math =-
+        // ==============================================
         float baseSpeed = 0.1f;
-        float sprintCap = 0.5f; // Soft speed cap
-        float absoluteCeiling = 1.0f; // Hard speed cap
+        float sprintCap = 0.5f;
+        float absoluteCeiling = 1.0f;
         float acceleration = 0.0025f;
 
         bool isMoving = (m_activeX != 0 || m_activeZ != 0);
 
-        // --- Long Jump decay phase ---
-        if (m_isBoosting) {
-            m_currentMomentum -= 0.015f; // Hemorrhaging speed here
-
-            // Once it drops to 0.35f, the decay ends
-            if (m_currentMomentum <= 0.35f) {
+        // -- Long Jump Decay Phase --
+        if (m_isBoosting)
+        {
+            m_currentMomentum -= 0.015f;
+            if (m_currentMomentum <= 0.35f)
+            {
                 m_currentMomentum = 0.35f;
                 m_isBoosting = false;
             }
         }
 
-        // --- Standard Coasting and Acceleration ---
-        if (!isMoving) {
-            // Player let go of the keyboard
-            // Auto-cancel the toggle and kill momentum
+        // -- Standard Coasting and Acceleration --
+        else if (!isMoving)
+        {
             m_isAccelerating = false;
             m_currentMomentum = baseSpeed;
-        } else {
-            // Player is actively moving
-            if (m_isAccelerating) {
-                // Only accelerate below the soft cap
-                if (m_currentMomentum < sprintCap) {
-                    m_currentMomentum += acceleration;
-                    if (m_currentMomentum > sprintCap) m_currentMomentum = sprintCap;
-                }
+        }
+        else
+        {
+            if (m_isAccelerating && m_currentMomentum < sprintCap)
+            {
+                m_currentMomentum += acceleration;
+                if (m_currentMomentum > sprintCap) m_currentMomentum = sprintCap;
             }
         }
-        // -------------------------------------------
 
-        // Hard cap safety net
-        // Ensures the tech never breaks (hopefully)
-        if (m_currentMomentum > absoluteCeiling) {
-            m_currentMomentum = absoluteCeiling;
-        }
+        if (m_currentMomentum > absoluteCeiling) m_currentMomentum = absoluteCeiling;
 
         // Get raw directional inputs (-1, 0, or 1)
         float inputX = 0.0f;
         float inputZ = 0.0f;
-
         if (m_activeZ == 'w') inputZ = 1.0f;
         else if (m_activeZ == 's') inputZ = -1.0f;
-
         if (m_activeX == 'd') inputX = 1.0f;
         else if (m_activeX == 'a') inputX = -1.0f;
 
-        // Vector Normalization (fix for the hypotenuse bug)
-        float inputMag = std::sqrt(inputX * inputX + inputZ * inputZ);
-        if (inputMag > 0.0f) {
-            inputX /= inputMag;
-            inputZ /= inputMag;
+        // 1. Calculate the pure intended direction
+        float targetDirX = (inputZ * fwdX + inputX * rightX);
+        float targetDirZ = (inputZ * fwdZ + inputX * rightZ);
+
+        float dirMag = std::sqrt(targetDirX * targetDirX + targetDirZ * targetDirZ);
+        if (dirMag > 0.0f)
+        {
+            targetDirX /= dirMag;
+            targetDirZ /= dirMag;
         }
 
-        // Apply Trigonometry based on where the camera is looking
-        float moveX = (inputZ * fwdX + inputX * rightX) * m_currentMomentum;
-        float moveZ = (inputZ * fwdZ + inputX * rightZ) * m_currentMomentum;
+        // 2. Apply the throttle (momentum is preserved)
+        float moveX = targetDirX * m_currentMomentum;
+        float moveZ = targetDirZ * m_currentMomentum;
 
-        // 2. X-axis collision (Move, check, revert if hit)
-        camera.position.x += moveX;
-        for (size_t i = 0; i < m_cubes.size(); ++i) {
-            if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox())) {
-                camera.position.x -= moveX; // Wall hit. Slide along it instead
-                m_currentMomentum = baseSpeed; // Wall slam penalty
-                break;
-            }
-        }
-
-        // 3. Z-axis collision (move, check, revert if hit)
-        camera.position.z += moveZ;
-        for (size_t i = 0; i < m_cubes.size(); ++i) {
-            if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox())) {
-                camera.position.z -= moveZ; // Wall hit
-                m_currentMomentum = baseSpeed;// Wall slam penalty
-                break;
-            }
-        }
-
-        // 4. Gravity and Y-axis collision
-        float baseGravity = -0.008f; // Standard falling speed
-        float floatGravity = -0.002f; // Slowed fall while holding space
-        float heavyGravity = -0.02f; // Aggressive falling cutting a jump short
-        float jumpForce = 0.15f; // The upward burst
-        float fastFallGravity = -0.025f; // Pulls you down when holding crouch
+        // =============================================
+        //  -= 2. Gravity Calculations =-
+        // =============================================
+        float baseGravity = -0.008f;
+        float floatGravity = -0.002f;
+        float heavyGravity = -0.02f;
+        float jumpForce = 0.15f;
+        float fastFallGravity = -0.025f;
 
         float currentGravity = baseGravity;
-        // Dynamic Gravity Calculator
-        if (camera.velocityY > 0.0f && !m_keySpace) {
-            // Player is moving up, but let go of space early
-            currentGravity = heavyGravity;
-        }
-        else if (camera.velocityY < 0.0f && m_keyShift) {
-            // Shift wins over space for fast falling
-            currentGravity = fastFallGravity;
-        }
-        else if (camera.velocityY < 0.0f && m_keySpace) {
-            // Player is falling down, but holding spacebar
-            currentGravity = floatGravity;
-        }
+        if (camera.velocityY > 0.0f && !m_keySpace) currentGravity = heavyGravity;
+        else if (camera.velocityY < 0.0f && m_keyShift) currentGravity = fastFallGravity;
+        else if (camera.velocityY < 0.0f && m_keySpace) currentGravity = floatGravity;
 
-        // 1. Always apply gravity to our vertical velocity
         camera.velocityY += currentGravity;
-        // 2. Apply the velocity to player's position
-        camera.position.y += camera.velocityY;
 
-        camera.isGrounded = false; // Reset the grounded state every frame to force proof
+        // ===================================================
+        // -= 3. Unified Vector Physics & Clipping =-
+        // ===================================================
 
-        vuron::AABB yHitbox = camera.getHitbox();
-        yHitbox.min.x += 0.05f; yHitbox.max.x -= 0.05f;
-        yHitbox.min.z += 0.05f; yHitbox.max.z -= 0.05f;
+        vuron::Vector3 vel = {moveX, camera.velocityY, moveZ};
+        float currentHeight = camera.isCrouched ? 1.5f : 2.0f;
+        camera.isGrounded = false;
 
-        // 3. Collision detection
+        // -- Flat Geometry Pass (X & Z)
+
+        // X-Axis
+        camera.position.x += vel.x;
+        vuron::AABB xBox = camera.getHitbox();
+        // Lift the feet slightly so we glide over floor polygons instead of snagging
+        xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            vuron::AABB cubeBox = m_cubes[i].getHitbox();
-            if (vuron::AABB::checkCollision(yHitbox, cubeBox))
+            if (!m_cubes[i].isRamp && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox()))
             {
-
-                // Falling down into a surface (floor)
-                if (camera.velocityY < 0.0f)
-                {
-                    float currentHeight = camera.isCrouched ? 1.5f : 2.0f;
-                    // Snap the player's feet perfectly to the top of the cube
-                    // +0.001f to prevent floating-point glitching
-                    camera.position.y = cubeBox.max.y + currentHeight + 0.001f;
-                    camera.velocityY = 0.0f;
-                    camera.isGrounded = true;
-                    camera.crouchedMidAir = false; // Reset midair strict lock when landing
-                }
-                // Jumping into a surface (ceiling)
-                else if (camera.velocityY > 0.0f)
-                {
-                    // Snap player head to the bottom of the cube
-                    camera.position.y = cubeBox.min.y - 0.201f;
-                    camera.velocityY = 0.0f;
-                }
+                camera.position.x -= vel.x; // Push out
+                vel.x = 0.0f; // Clip
                 break;
             }
         }
 
-        // ================================================
-        // 4. Jump Execution (Relying purely on Geometrical physics)
-        // ================================================
+        // Z-Axis
+        camera.position.z += vel.z;
+        vuron::AABB zBox = camera.getHitbox();
+        // Lift feet to glide over floors, yadda yaddda
+        zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
+        for (size_t i = 0; i < m_cubes.size(); ++i)
+        {
+            if (!m_cubes[i].isRamp && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox()))
+            {
+                camera.position.z -= vel.z; // Push out
+                vel.z = 0.0f; // Clip
+                break;
+            }
+        }
+
+        // -- Y-Axis Pass (Gravity & Floors) --
+        camera.position.y += vel.y;
+        for (size_t i = 0; i < m_cubes.size(); ++i)
+        {
+            if (!m_cubes[i].isRamp && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
+            {
+                if (vel.y < 0.0f) // Floor
+                {
+                    camera.position.y = m_cubes[i].getHitbox().max.y + currentHeight + 0.001f;
+                    camera.isGrounded = true;
+                    camera.crouchedMidAir = false;
+                }
+                else if (vel.y > 0.0f) // Ceiling
+                {
+                    camera.position.y = m_cubes[i].getHitbox().min.y - 0.201f;
+                }
+                vel.y = 0.0f;
+                break;
+            }
+        }
+
+        // -- Ramp Pass --
+        for (size_t i = 0; i < m_cubes.size(); ++i)
+        {
+            if (m_cubes[i].isRamp)
+            {
+                if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
+                {
+                    float cx = m_cubes[i].position.x; float cy = m_cubes[i].position.y; float cz = m_cubes[i].position.z;
+                    float nx = m_cubes[i].normal.x;   float ny = m_cubes[i].normal.x;   float nz = m_cubes[i].normal.z;
+                    if (ny == 0.0f) ny = 0.0001f; // Prevent div by 0
+
+                    float playerFeetY = camera.position.y - currentHeight;
+                    float slopeHeight = cy - ((nx * (camera.position.x - cx) + nz * (camera.position.z - cz)) / ny);
+
+                    if (playerFeetY < slopeHeight && playerFeetY > slopeHeight - 1.5f)
+                    {
+                        camera.position.y = slopeHeight + currentHeight + 0.001f;
+                        float impact = vuron::dot(vel, m_cubes[i].normal);
+                        if (impact < 0.0f)
+                        {
+                            vel.x -= m_cubes[i].normal.x * impact;
+                            vel.y -= m_cubes[i].normal.y * impact;
+                            vel.z -= m_cubes[i].normal.z * impact;
+                        }
+                        if (ny > 0.7f)
+                        {
+                            camera.isGrounded = true;
+                            camera.crouchedMidAir = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        // =================================================
+        // -= 4. Decouple Throttle from Physics =-
+        // =================================================
+        float survivingSpeed = std::sqrt(vel.x * vel.x + vel.z * vel.z); // Y-axis strictly not here
+
+        // If the player moved into a flat wall and was completely stopped on both axes
+        if (survivingSpeed == 0.0f && isMoving)
+        {
+            m_currentMomentum = baseSpeed;
+        }
+
+        // Otherwise, leave m_currentMomentum along. Don't let wall friction shrink the throttle.baseSpeed
+
+        camera.velocityY = vel.y;
+
+
+        // ===================================================================
+        //  -= 5. Jump Execution (Relying purely on Geometrical physics) =-
+        // ===================================================================
 
         // Always reset the physical key lock if the player let go of space
         if (!m_keySpace)
@@ -694,7 +736,7 @@ namespace vuron {
 
 
         // ===========================================
-        // -- 5. Debug Menu --
+        // -= 6. Debug Menu =-
         // ===========================================
         static NSTextField* debugLabel = nil;
 

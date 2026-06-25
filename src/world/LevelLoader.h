@@ -40,15 +40,37 @@ namespace vuron
                     std::string type;
                     iss >> type;
 
-                    if (type == "CUBE")
+                    if (type == "CUBE" || type == "RAMP")
                     {
                         float x, y, z, w, h, d;
+                        float rx = 0.0f, ry = 0.0f, rz = 0.0f; // Default to flat
+
+                        // Read the standard 6 numbers
                         if (iss >> x >> y >> z >> w >> h >> d)
                         {
+                            // Try to read the optional 3 rotational values
+                            if (iss >> rx >> ry >> rz)
+                            {
+                                // Convert degrees to radians for the math engine
+                                rx = rx * (3.14159265f / 180.0f);
+                                ry = ry * (3.14159265f / 180.0f);
+                                rz = rz * (3.14159265f / 180.0f);
+                            }
+
                             vuron::Transform t;
                             t.position = {x, y, z};
-                            t.rotation = {0.0f, 0.0f, 0.0f};
+                            t.rotation = {rx, ry, rz};
                             t.scale = {w, h, d};
+
+                            // -- The Ramp Flag --
+                            if (type == "RAMP")
+                            {
+                                t.isRamp = true;
+                                // Calculate the normal vector
+                                vuron::Matrix4x4 rot = vuron::Matrix4x4::rotation(rx, ry, rz);
+                                t.normal = {rot.m[1][0], rot.m[1][1], rot.m[1][2]};
+                            }
+
                             levelGeometry.push_back(t);
                         }
                         else
@@ -57,7 +79,6 @@ namespace vuron
                         }
                     }
 
-                    // Later I'll add 'elfe if type == ramp' here
                 }
 
                 file.close();
