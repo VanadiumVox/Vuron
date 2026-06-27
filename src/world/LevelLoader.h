@@ -40,7 +40,7 @@ namespace vuron
                     std::string type;
                     iss >> type;
 
-                    if (type == "CUBE" || type == "RAMP")
+                    if (type == "CUBE" || type == "WEDGE")
                     {
                         float x, y, z, w, h, d;
                         float rx = 0.0f, ry = 0.0f, rz = 0.0f; // Default to flat
@@ -62,13 +62,19 @@ namespace vuron
                             t.rotation = {rx, ry, rz};
                             t.scale = {w, h, d};
 
-                            // -- The Ramp Flag --
-                            if (type == "RAMP")
+                            // -- WEDGE logic --
+                            if (type == "WEDGE")
                             {
-                                t.isRamp = true;
-                                // Calculate the normal vector
-                                vuron::Matrix4x4 rot = vuron::Matrix4x4::rotation(rx, ry, rz);
-                                t.normal = {rot.m[1][0], rot.m[1][1], rot.m[1][2]};
+                                t.type = vuron::ShapeType::WEDGE;
+
+                                // The normal for a 45-degree unrotated wedge
+                                vuron::Vector3 defaultNormal = {0.0f, 0.7071f, 0.7071f};
+
+                                // Spin the normal using the exact same matrix the GPU uses
+                                vuron::Matrix4x4 rotMat = vuron::Matrix4x4::rotation(rx, ry, rz);
+                                t.normal.x = defaultNormal.x * rotMat.m[0][0] + defaultNormal.y * rotMat.m[1][0] + defaultNormal.z * rotMat.m[2][0];
+                                t.normal.y = defaultNormal.x * rotMat.m[0][1] + defaultNormal.y * rotMat.m[1][1] + defaultNormal.z * rotMat.m[2][1];
+                                t.normal.z = defaultNormal.x * rotMat.m[0][2] + defaultNormal.y * rotMat.m[1][2] + defaultNormal.z * rotMat.m[2][2];
                             }
 
                             levelGeometry.push_back(t);

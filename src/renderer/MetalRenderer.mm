@@ -214,37 +214,80 @@ namespace vuron {
 //       m_vertexBuffer = (void*)vertexBuffer;
 
         // Creating the first Vuron Cube
-        vuron::Vertex cubeVertices[] = {
-        // Front face (z = -0.5)
-        {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 0: Top Left (Red)
-        {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // 1: Top Right (Green)
-        {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 2: Bottom Left (Blue)
-        {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 3: Bottom Right (Yellow)
-        // Back face (z = 0.5)
-        {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}, // 4: Top Left (Magenta)
-        {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 5: Top Right (Cyan)
-        {{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}}, // 6: Bottom Left (White)
-        {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 0.0f}}, // 7: Bottom Right (Black)
-        };
+//         vuron::Vertex cubeVertices[] = {
+//         // Front face (z = -0.5)
+//         {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 0: Top Left (Red)
+//         {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // 1: Top Right (Green)
+//         {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 2: Bottom Left (Blue)
+//         {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 3: Bottom Right (Yellow)
+//         // Back face (z = 0.5)
+//         {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}, // 4: Top Left (Magenta)
+//         {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 5: Top Right (Cyan)
+//         {{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}}, // 6: Bottom Left (White)
+//         {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 0.0f}}, // 7: Bottom Right (Black)
+//         };
+//
+//         uint16_t cubeIndices[] = {
+//         0, 2, 1,  1, 2, 3, // Front
+//         1, 3, 5,  5, 3, 7, // Right
+//         5, 7, 4,  4, 7, 6, // Back
+//         4, 6, 0,  0, 6, 2, // Left
+//         4, 0, 5,  5, 0, 1, // Top
+//         2, 6, 3,  3, 6, 7  // Bottom
+//         };
 
-        uint16_t cubeIndices[] = {
-        0, 2, 1,  1, 2, 3, // Front
-        1, 3, 5,  5, 3, 7, // Right
-        5, 7, 4,  4, 7, 6, // Back
-        4, 6, 0,  0, 6, 2, // Left
-        4, 0, 5,  5, 0, 1, // Top
-        2, 6, 3,  3, 6, 7  // Bottom
-        };
 
-      // 1. Sending 8 points to the GPU
-      id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:cubeVertices
-                                    length:(sizeof(vuron::Vertex) * 8)
+       // --- Creating the Shapes for Vuron ---
+       vuron::Vertex allVertices[] =
+       {
+             // --- CUBE (Vertices 0-7) ---
+             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 0: Top Left (Red)
+             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // 1: Top Right (Green)
+             {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 2: Bottom Left (Blue)
+             {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 3: Bottom Right (Yellow)
+             {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}, // 4: Top Left Back (Magenta)
+             {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 5: Top Right Back (Cyan)
+             {{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}}, // 6: Bottom Left Back (White)
+             {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 0.0f}}, // 7: Bottom Right Back (Black)
+
+             // --- WEDGE (Vertices 8-13) ---
+             // A Wedge tall at the front (-z) and flat at the back (+z), matching our Up/Forward normal
+             {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 8: Bottom Left Front
+             {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // 9: Bottom Right Front
+             {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // 10: Bottom Left Back (The thin tip)
+             {{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // 11: Bottom Right Back (The thin tip)
+             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}}, // 12: Top Left Front (The high wall)
+             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}}  // 13: Top Right Front (The high wall)
+       };
+
+       uint16_t allIndices[] =
+       {
+           // --- CUBE INDICES (0 to 35) ---
+           0, 2, 1,  1, 2, 3, // Front
+           1, 3, 5,  5, 3, 7, // Right
+           5, 7, 4,  4, 7, 6, // Back
+           4, 6, 0,  0, 6, 2, // Left
+           4, 0, 5,  5, 0, 1, // Top
+           2, 6, 3,  3, 6, 7, // Bottom
+
+           // --- WEDGE INDICES (36 to 59) ---
+           12, 8, 13,   13, 8, 9,    // Front Wall (Flat)
+           8, 10, 9,    9, 10, 11,   // Bottom Floor (Flat)
+           12, 13, 10,  13, 11, 10,  // Sloped Top Face (The Ramp itself)
+           12, 10, 8,                // Left Triangle
+           13, 9, 11                 // Right Triangle
+       };
+
+
+      // 1. Sending 14 points to the GPU
+      id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:allVertices
+                                    length:(sizeof(vuron::Vertex) * 14)
                                     options:MTLResourceStorageModeShared];
       m_vertexBuffer = (void*)vertexBuffer;
 
       //2. Sending instruction map to the GPU
-      id<MTLBuffer> indexBuffer = [device newBufferWithBytes:cubeIndices
-                                    length:(sizeof(uint16_t) * 36)
+      id<MTLBuffer> indexBuffer = [device newBufferWithBytes:allIndices
+                                    length:(sizeof(uint16_t) * 60)
                                     options:MTLResourceStorageModeShared];
       m_indexBuffer = (void*)indexBuffer;
 
@@ -470,10 +513,28 @@ namespace vuron {
             };
 
             bool ceilingClear = true;
-            for (size_t i = 0; i < m_cubes.size(); ++i) {
-                if (vuron::AABB::checkCollision(ghostBox, m_cubes[i].getHitbox())) {
-                    ceilingClear = false; // Head hit something. Stay crouched
-                    break;
+            for (size_t i = 0; i < m_cubes.size(); ++i)
+            {
+                if (vuron::AABB::checkCollision(ghostBox, m_cubes[i].getHitbox()))
+                {
+                    if (m_cubes[i].type == vuron::ShapeType::CUBE)
+                    {
+                        ceilingClear = false; // Hit ceiling
+                        break;
+                    }
+                    else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                    {
+                        // Calculate the slope height at the ghost box's position
+                        float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
+                        float slopeH = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
+
+                        // If our head is below the slanted roof, we are trapped
+                        if (ghostBox.max.y < slopeH)
+                        {
+                            ceilingClear = false;
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -579,11 +640,22 @@ namespace vuron {
         xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            if (!m_cubes[i].isRamp && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox()))
+            if (vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox()))
             {
-                camera.position.x -= vel.x; // Push out
-                vel.x = 0.0f; // Clip
-                break;
+                if (m_cubes[i].type == vuron::ShapeType::CUBE)
+                {
+                    camera.position.x -= vel.x; vel.x = 0.0f; break;
+                }
+                else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                {
+                    float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
+                    float slopeH = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
+                    // If we are below the slope surface, we hit a solid wall
+                    if (camera.position.y - currentHeight < slopeH - 0.1f)
+                    {
+                        camera.position.x -= vel.x; vel.x = 0.0f; break;
+                    }
+                }
             }
         }
 
@@ -594,11 +666,22 @@ namespace vuron {
         zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            if (!m_cubes[i].isRamp && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox()))
+            if (vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox()))
             {
-                camera.position.z -= vel.z; // Push out
-                vel.z = 0.0f; // Clip
-                break;
+                if (m_cubes[i].type == vuron::ShapeType::CUBE)
+                {
+                    camera.position.z -= vel.z; vel.z = 0.0f; break;
+                }
+                else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                {
+                    float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
+                    float slopeH = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
+                    // If we are below the slope surface, we hit a solid wall
+                    if (camera.position.y - currentHeight < slopeH - 0.1f)
+                    {
+                        camera.position.z -= vel.z; vel.z = 0.0f; break;
+                    }
+                }
             }
         }
 
@@ -606,7 +689,7 @@ namespace vuron {
         camera.position.y += vel.y;
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            if (!m_cubes[i].isRamp && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
+            if (m_cubes[i].type != vuron::ShapeType::WEDGE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
             {
                 if (vel.y < 0.0f) // Floor
                 {
@@ -623,30 +706,55 @@ namespace vuron {
             }
         }
 
-        // -- Ramp Pass --
+        // -- Wedge Pass --
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            if (m_cubes[i].isRamp)
+            if (m_cubes[i].type == vuron::ShapeType::WEDGE)
             {
+                // Broad phase: is player anywhere near the bounding box?
                 if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
                 {
-                    float cx = m_cubes[i].position.x; float cy = m_cubes[i].position.y; float cz = m_cubes[i].position.z;
-                    float nx = m_cubes[i].normal.x;   float ny = m_cubes[i].normal.x;   float nz = m_cubes[i].normal.z;
+                    float cx = m_cubes[i].position.x;
+                    float cy = m_cubes[i].position.y;
+                    float cz = m_cubes[i].position.z;
+                    float nx = m_cubes[i].normal.x;
+                    float ny = m_cubes[i].normal.y;
+                    float nz = m_cubes[i].normal.z;
+
                     if (ny == 0.0f) ny = 0.0001f; // Prevent div by 0
 
                     float playerFeetY = camera.position.y - currentHeight;
+
+                    // Narrow phase: the plane equation
+                    // Calculate exact y height of the slope at player's coordinates
                     float slopeHeight = cy - ((nx * (camera.position.x - cx) + nz * (camera.position.z - cz)) / ny);
 
+                    // If our feet clip the slanted face of the wedge but we aren't deeply beneath it
                     if (playerFeetY < slopeHeight && playerFeetY > slopeHeight - 1.5f)
                     {
+                        // 1. Push the player up so they rest on the surface
                         camera.position.y = slopeHeight + currentHeight + 0.001f;
+
+                        // 2. The vector clip
                         float impact = vuron::dot(vel, m_cubes[i].normal);
-                        if (impact < 0.0f)
+
+                        if (impact < 0.0f) // Moving into the slope
                         {
-                            vel.x -= m_cubes[i].normal.x * impact;
-                            vel.y -= m_cubes[i].normal.y * impact;
-                            vel.z -= m_cubes[i].normal.z * impact;
+                            // Calculate the push-back vectors
+                            float pushX = -(m_cubes[i].normal.x * impact);
+                            float pushY = -(m_cubes[i].normal.y * impact);
+                            float pushZ = -(m_cubes[i].normal.z * impact);
+
+                            vel.x += pushX;
+                            vel.y += pushY;
+                            vel.z += pushZ;
+
+                            // Physically slide the player
+                            camera.position.x += pushX;
+                            camera.position.z += pushZ;
                         }
+
+                        // Ground the player if the slope is flat enough
                         if (ny > 0.7f)
                         {
                             camera.isGrounded = true;
@@ -822,13 +930,24 @@ namespace vuron {
             // Inject the matrix directly into GPU Register slot 1
             [encoder setVertexBytes:&mvpMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
 
-            // Execute the draw using the map, connecting the dots
-            [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                                indexCount:36
+            if (m_cubes[i].type == vuron::ShapeType::CUBE)
+            {
+                // Execute the draw using the map, connecting the dots
+                [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                    indexCount:36
+                                    indexType:MTLIndexTypeUInt16
+                                    indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                                    indexBufferOffset:0];
+            }
+            else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+            {
+                // Offset by exactly 72 bytes (36 cube indices * 2 bytes each()
+                [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                indexCount:24
                                 indexType:MTLIndexTypeUInt16
                                 indexBuffer:(id<MTLBuffer>)m_indexBuffer
-                                indexBufferOffset:0];
-
+                                indexBufferOffset:72];
+            }
         }
       }
 

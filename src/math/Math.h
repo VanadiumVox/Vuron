@@ -195,6 +195,12 @@ namespace vuron
         }
     };
 
+    enum class ShapeType
+    {
+        CUBE,
+        WEDGE
+    };
+
     // A 3D transform that holds position, rotation and scale for any entity
     struct Transform
     {
@@ -202,9 +208,9 @@ namespace vuron
         Vector3 rotation = {0.0f, 0.0f, 0.0f};
         Vector3 scale = {1.0f, 1.0f, 1.0f};
 
-        // Ramp Data
-        bool isRamp = false;
-        Vector3 normal = {0.0f, 1.0f, 0.0f}; // The direction the slope faces
+        // --- Geometry Data ---
+        ShapeType type = ShapeType::CUBE; // Default to a cube
+        Vector3 normal = {0.0f, 1.0f, 0.0f}; // Only used if it's a wedge
 
         // Generates a 3D hitbox wrapped around the unrotated cube
         AABB getHitbox() const {
