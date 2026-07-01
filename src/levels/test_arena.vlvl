@@ -25,3 +25,6 @@ CUBE 0.0 0.5 14.0 3.0 1.0 1.0
 
 # Unrotated wedge (sloping upwards)
 WEDGE 10.0 1.0 10.0  8.0 4.0 4.0
+
+# Surf Test
+WEDGE 10.0 1.0 50.0  50.0 7.0 7.0  0.0 90.0 0.0

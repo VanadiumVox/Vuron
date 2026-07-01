@@ -213,20 +213,48 @@ namespace vuron
         Vector3 normal = {0.0f, 1.0f, 0.0f}; // Only used if it's a wedge
 
         // Generates a 3D hitbox wrapped around the unrotated cube
-        AABB getHitbox() const {
-            // Assuming out base 3D cube model is exactly 2x2x2 units large
-            return {
+        AABB getHitbox() const
+        {
+            // Fast path: If it's a flat, unrotated object, use cheaper math
+            if (rotation.x == 0.0f && rotation.y == 0.0f && rotation.z == 0.0f)
+            {
+                return
                 {
-                    position.x - (scale.x * 0.5f),
-                    position.y - (scale.y * 0.5f),
-                    position.z - (scale.z * 0.5f)
-                },
+                    {position.x - (scale.x * 0.5f), position.y - (scale.y * 0.5f), position.z - (scale.z * 0.5f)},
+                    {position.x + (scale.x * 0.5f), position.y + (scale.y * 0.5f), position.z + (scale.z * 0.5f)}
+                };
+            }
+
+            // Dynamic path: The object is tilted. So we calculate an AABB that wraps the rotated corners
+            else
+            {
+                Matrix4x4 model = getModelMatrix();
+                Vector3 min = {99999.0f, 99999.0f, 99999.0f};
+                Vector3 max = {-99999.0f, -99999.0f, -99999.0f};
+
+                float dx[2] = {-0.5f, 0.5f};
+                float dy[2] = {-0.5f, 0.5f};
+                float dz[2] = {-0.5f, 0.5f};
+
+                // Mapping all 8 corners through the rotation matrix to find the extreme edges
+                for(int i = 0; i < 2; i++)
                 {
-                    position.x + (scale.x * 0.5f),
-                    position.y + (scale.y * 0.5f),
-                    position.z + (scale.z * 0.5f)
+                    for(int j = 0; j < 2; j++)
+                    {
+                        for(int k = 0; k < 2; k++)
+                        {
+                            float wx = dx[i] * model.m[0][0] + dy[j] * model.m[1][0] + dz[k] * model.m[2][0] + model.m[3][0];
+                            float wy = dx[i] * model.m[0][1] + dy[j] * model.m[1][1] + dz[k] * model.m[2][1] + model.m[3][1];
+                            float wz = dx[i] * model.m[0][2] + dy[j] * model.m[1][2] + dz[k] * model.m[2][2] + model.m[3][2];
+
+                            if (wx < min.x) min.x = wx; if (wx > max.x) max.x = wx;
+                            if (wy < min.y) min.y = wy; if (wy > max.y) max.y = wy;
+                            if (wz < min.z) min.z = wz; if (wz > max.z) max.z = wz;
+                        }
+                    }
                 }
-            };
+                return {min, max};
+            }
         }
 
         // Automatically generates the Model Matrix for the entity

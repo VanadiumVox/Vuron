@@ -651,7 +651,7 @@ namespace vuron {
                     float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
                     float slopeH = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
                     // If we are below the slope surface, we hit a solid wall
-                    if (camera.position.y - currentHeight < slopeH - 0.1f)
+                    if (camera.position.y - currentHeight < slopeH - 1.5f)
                     {
                         camera.position.x -= vel.x; vel.x = 0.0f; break;
                     }
