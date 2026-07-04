@@ -13,6 +13,7 @@ struct VertexOut {
 //[[position]] tells the mac hardware that "This is the final coordinate on screen"
     float4 position [[position]];
     float3 color;
+    float2 localPos;
 };
 
 // The math program (runs on GPU cores)
@@ -28,6 +29,7 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
     out.position = mvpMatrix * float4(in.position, 1.0);
 
     out.color = in.color;
+    out.localPos = float2(in.position[0], in.position[2]);
 
     return out;
 }
@@ -36,8 +38,21 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
 // [[stade_in]] tells the hardware to take the Vertex Shader otuput
 // and put it directly in this function
 // P.S, I'm leaving that as 'otuput' to prove that this was written by a human.
-fragment float4 fragmentMain(VertexOut in [[stage_in]]) {
-    // We take the 3 dimensional color (r,g,b) from the Vertex Shader
-    // and add an opacity(alpha) value of 1 to make it solid
+fragment float4 fragmentMain(VertexOut in [[stage_in]],
+                             constant float& alphaFlag [[buffer(2)]])
+{
+    // If the C++ engine sends an alpha lower than 1, it's the shadow.
+    if (alphaFlag < 1.0)
+    {
+        // Measure distance from the center. if outside 0.5 radius, destroy pixel
+        if (length(in.localPos) > 0.5)
+        {
+            discard_fragment();
+        }
+        // Return pure black, blended by alpha value to darken the floor
+        return float4(0.0, 0.0, 0.0, alphaFlag);
+    }
+
+    // Otherwise, draw solid standard geometry
     return float4(in.color, 1.0);
 }

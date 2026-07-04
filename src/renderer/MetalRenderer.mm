@@ -164,6 +164,11 @@ namespace vuron {
       pipelineDesc.fragmentFunction = fragmentFunc;
       // Telling the shader that the output must perfectly match window's color format
       pipelineDesc.colorAttachments[0].pixelFormat = metalLayer.pixelFormat;
+      // --- Enabling Transparency Blending (for shadow) ---
+      pipelineDesc.colorAttachments[0].blendingEnabled = YES;
+      pipelineDesc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+      pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+      // ---------------------------------------------------
       // Tell the pipeline to expect 32-bit Float depth math
       pipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
 
@@ -257,7 +262,13 @@ namespace vuron {
              {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // 10: Bottom Left Back (The thin tip)
              {{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // 11: Bottom Right Back (The thin tip)
              {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}}, // 12: Top Left Front (The high wall)
-             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}}  // 13: Top Right Front (The high wall)
+             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},  // 13: Top Right Front (The high wall)
+
+             // --- Shadow Quad (Vertices 14-17) ---
+             {{-0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}},
+             {{ 0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}},
+             {{-0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}},
+             {{ 0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}}
        };
 
        uint16_t allIndices[] =
@@ -275,19 +286,22 @@ namespace vuron {
            8, 10, 9,    9, 10, 11,   // Bottom Floor (Flat)
            12, 13, 10,  13, 11, 10,  // Sloped Top Face (The Ramp itself)
            12, 10, 8,                // Left Triangle
-           13, 9, 11                 // Right Triangle
+           13, 9, 11,                 // Right Triangle
+
+           // --- Shadow Indices (60 to 65) ---
+           14, 16, 15,  15, 16, 17
        };
 
 
       // 1. Sending 14 points to the GPU
       id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:allVertices
-                                    length:(sizeof(vuron::Vertex) * 14)
+                                    length:(sizeof(vuron::Vertex) * 18)
                                     options:MTLResourceStorageModeShared];
       m_vertexBuffer = (void*)vertexBuffer;
 
       //2. Sending instruction map to the GPU
       id<MTLBuffer> indexBuffer = [device newBufferWithBytes:allIndices
-                                    length:(sizeof(uint16_t) * 60)
+                                    length:(sizeof(uint16_t) * 66)
                                     options:MTLResourceStorageModeShared];
       m_indexBuffer = (void*)indexBuffer;
 
@@ -920,6 +934,58 @@ namespace vuron {
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
         [encoder setDepthStencilState:(id<MTLDepthStencilState>)m_depthStencilState];
 
+        // Ensure normal geometry draws completely solid
+        float solidAlpha = 1.0f;
+        [encoder setFragmentBytes:&solidAlpha length:sizeof(float) atIndex:2];
+
+        // =============================================================
+        // --- Shadow Drop Cast Algorithm ---
+        // =============================================================
+        float shadowY = -9999.0f;
+        vuron::Vector3 shadowRot = {0.0f, 0.0f, 0.0f};
+        bool shadowOnWedge = false;
+        bool drawShadow = false;
+
+        // Shoot a line straight down to find the highest floor beneath us
+        for (size_t i = 0; i < m_cubes.size(); ++i)
+        {
+            vuron::AABB box = m_cubes[i].getHitbox();
+
+            // Check if our X/Z coords are hovering over this specific objext
+            if (camera.position.x >= box.min.x && camera.position.x <= box.max.x &&
+                camera.position.z >= box.min.z && camera.position.z <= box.max.z)
+                {
+                    float testY = -9999.0f;
+
+                    if (m_cubes[i].type == vuron::ShapeType::CUBE)
+                    {
+                        testY = box.max.y; // Flat roof
+                    }
+                    else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                    {
+                        // Sloped roof. Calculate the exact plane height
+                        float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
+                        testY = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
+                    }
+
+                    // If this object is below us & it's higher than the last floor we checked
+                    if (testY <= camera.position.y && testY > shadowY)
+                    {
+                        shadowY = testY;
+                        shadowRot = m_cubes[i].rotation; // Steal the geometry's exact rotation
+                        shadowOnWedge = (m_cubes[i].type == vuron::ShapeType::WEDGE);
+                    }
+                }
+        }
+
+        // Optimization: Only draw if the floor is within 100 units
+        if (camera.position.y - shadowY <= 100.0f && shadowY != -9999.0f)
+        {
+            drawShadow = true;
+        }
+
+        // ===========================================================
+
         // 4. The Rendering loop (every entity drawn independently)
         for (size_t i = 0; i < m_cubes.size(); ++i) {
 
@@ -948,6 +1014,33 @@ namespace vuron {
                                 indexBuffer:(id<MTLBuffer>)m_indexBuffer
                                 indexBufferOffset:72];
             }
+        }
+
+        // 5. Draw the Shadow (on top of the rest)
+        if (drawShadow)
+        {
+            // Flip the swithc in the Fragment shader to activate transparency & circle math
+            float shadowAlpha = 0.5f;
+            [encoder setFragmentBytes:&shadowAlpha length:sizeof(float) atIndex:2];
+
+            // Build the shadow matrix manually
+            vuron::Matrix4x4 intrinsicRot = vuron::Matrix4x4::rotationX(shadowOnWedge ? -0.785398f : 0.0f);
+            vuron::Matrix4x4 rx = vuron::Matrix4x4::rotationX(shadowRot.x);
+            vuron::Matrix4x4 ry = vuron::Matrix4x4::rotationY(shadowRot.y);
+            vuron::Matrix4x4 rz = vuron::Matrix4x4::rotationZ(shadowRot.z);
+            // Snap it to exactly 0.01f units above the floor
+            vuron::Matrix4x4 t = vuron::Matrix4x4::translation(camera.position.x, shadowY + 0.01f, camera.position.z);
+
+            vuron::Matrix4x4 shadowMVP = intrinsicRot * rx * ry * rz * t * viewMatrix * projectionMatrix;
+
+            [encoder setVertexBytes:&shadowMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
+
+            // Offset exactly 120 bytes (60 previous indices * 2 bytes each) to reach the shadow indices
+            [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                indexCount:6
+                                indexType:MTLIndexTypeUInt16
+                                indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                                indexBufferOffset:120];
         }
       }
 
