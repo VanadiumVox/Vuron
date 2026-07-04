@@ -13,7 +13,7 @@ struct VertexOut {
 //[[position]] tells the mac hardware that "This is the final coordinate on screen"
     float4 position [[position]];
     float3 color;
-    float2 localPos;
+    float3 localPos;
 };
 
 // The math program (runs on GPU cores)
@@ -29,7 +29,7 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
     out.position = mvpMatrix * float4(in.position, 1.0);
 
     out.color = in.color;
-    out.localPos = float2(in.position[0], in.position[2]);
+    out.localPos = float3(in.position[0], in.position[1], in.position[2]);
 
     return out;
 }
@@ -41,11 +41,29 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
 fragment float4 fragmentMain(VertexOut in [[stage_in]],
                              constant float& alphaFlag [[buffer(2)]])
 {
+
+    // --- The Crosshair Pass ---
+    if (alphaFlag > 1.5)
+    {
+        float thickness = 0.15; // Width of the bars
+        float size = 0.8; // Length of the bars
+
+        // Carving out a '+' sign
+        if ((abs(in.localPos.x) > thickness && abs(in.localPos.y) > thickness) ||
+            abs(in.localPos.x) > size || abs(in.localPos.y) > size)
+            {
+                discard_fragment();
+            }
+            // Output pure white. The Metal Pipeline will convert to color inversion
+            return float4(1.0, 1.0, 1.0, 1.0);
+    }
+
+    // --- The Shadow Pass ---
     // If the C++ engine sends an alpha lower than 1, it's the shadow.
-    if (alphaFlag < 1.0)
+    else if (alphaFlag < 1.0)
     {
         // Measure distance from the center. if outside 0.5 radius, destroy pixel
-        if (length(in.localPos) > 0.5)
+        if (length(in.localPos.xz) > 0.5)
         {
             discard_fragment();
         }
@@ -53,6 +71,6 @@ fragment float4 fragmentMain(VertexOut in [[stage_in]],
         return float4(0.0, 0.0, 0.0, alphaFlag);
     }
 
-    // Otherwise, draw solid standard geometry
+    // --- Standard Geometry ---
     return float4(in.color, 1.0);
 }

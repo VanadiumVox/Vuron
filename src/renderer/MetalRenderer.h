@@ -38,6 +38,7 @@ namespace vuron
         void* m_commandQueue; // id<MTLCommandQueue>
         void* m_metalLayer; // CAMetalLayer*
         void* m_pipelineState; // id<MTLRenderPipelineState>
+        void* m_uiPipelineState; // Drawing the crosshair
         void* m_vertexBuffer; //  id<MTLBuffer>
         void* m_indexBuffer; // id<MTLBuffer
         void* m_depthTexture; // Stores z-dist of every pixel instead of color

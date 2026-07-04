@@ -179,6 +179,19 @@ namespace vuron {
         return false;
       }
       m_pipelineState = (void*)pipelineState;
+
+      // -= UI Pipeline (Color Inversion) =-
+      // Changing the math to: 1.0 * (1.0 - destinationColor) + destinationColor * 0.0 = invertedColor
+      pipelineDesc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOneMinusDestinationColor;
+      pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorZero;
+
+      id<MTLRenderPipelineState> uiState = [device newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
+      if (!uiState)
+      {
+        NSLog(@"Failed to create UI pipeline state: %@", error);
+      }
+      m_uiPipelineState = (void*)uiState;
+
       std::cout << "Vuron Shaders successfuly compiled" << std::endl;
 
       // ----------------------------------------------------
@@ -268,7 +281,14 @@ namespace vuron {
              {{-0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}},
              {{ 0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}},
              {{-0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}},
-             {{ 0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}}
+             {{ 0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}},
+
+             // --- CROSSHAIR QUAD (Vertices 18-21) ---
+             // A flat square facing the screen (using X and Y axes)
+             {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+             {{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+             {{-0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+             {{ 0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}}
        };
 
        uint16_t allIndices[] =
@@ -289,19 +309,22 @@ namespace vuron {
            13, 9, 11,                 // Right Triangle
 
            // --- Shadow Indices (60 to 65) ---
-           14, 16, 15,  15, 16, 17
+           14, 16, 15,  15, 16, 17,
+
+           // --- Crosshair Indices (66 to 71) ---
+           18, 20, 19,  19, 20, 21
        };
 
 
       // 1. Sending 14 points to the GPU
       id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:allVertices
-                                    length:(sizeof(vuron::Vertex) * 18)
+                                    length:(sizeof(vuron::Vertex) * 22)
                                     options:MTLResourceStorageModeShared];
       m_vertexBuffer = (void*)vertexBuffer;
 
       //2. Sending instruction map to the GPU
       id<MTLBuffer> indexBuffer = [device newBufferWithBytes:allIndices
-                                    length:(sizeof(uint16_t) * 66)
+                                    length:(sizeof(uint16_t) * 72)
                                     options:MTLResourceStorageModeShared];
       m_indexBuffer = (void*)indexBuffer;
 
@@ -1042,6 +1065,33 @@ namespace vuron {
                                 indexBuffer:(id<MTLBuffer>)m_indexBuffer
                                 indexBufferOffset:120];
         }
+
+        // =======================================
+        // --- Draw the UI (Crosshair) ---
+        // =======================================
+        // 1. Switch the GPU to the Inversion pipeline
+        [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_uiPipelineState];
+
+        // 2. Set the alphaFlag > 1.5 to trigger the crosshair carving-out
+        float uiAlpha = 2.0f;
+        [encoder setFragmentBytes:&uiAlpha length:sizeof(float) atIndex:2];
+
+        // 3. The single number to change crosshair size
+        float crosshairScale = 0.04f;
+
+        // 4. The aspect ratio fix
+        float aspectSquish = 16.0f / 9.0f;
+
+        //We only scale. No translations, no camera matrices. It thus stays perfectly centered (hypothetically)
+        vuron::Matrix4x4 uiMVP = vuron::Matrix4x4::scale(crosshairScale / aspectSquish, crosshairScale, 1.0f);
+        [encoder setVertexBytes:&uiMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
+
+        // 5. Draw it. Offset exactly 132 bytes (66 indices * 2 bytes each)
+        [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                            indexCount:6
+                            indexType:MTLIndexTypeUInt16
+                            indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                            indexBufferOffset:132];
       }
 
       [encoder endEncoding];
