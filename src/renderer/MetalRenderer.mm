@@ -880,76 +880,12 @@ namespace vuron {
         // ================================================
 
 
-        // ===========================================
-        // -= 6. Debug Menu =-
-        // ===========================================
-        static NSTextField* debugLabel = nil;
-
-        // 1. Capture the exact variables we need
-        bool showMenu = m_showDebugMenu;
-        float px = camera.position.x;
-        float py = camera.position.y;
-        float pz = camera.position.z;
-        float currentSpeed = m_currentMomentum;
-        bool isAccel = m_isAccelerating;
-
-        // 2. Throw the UI drawing logic over to the main thread
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (showMenu) {
-                // Lazy Initialization
-                if (!debugLabel) {
-                    NSWindow *window = [NSApp mainWindow];
-                    if (!window) window = [NSApp keyWindow]; // Fallback if mainWindow isn't set yet
-                    if (window) {
-                        NSView*mainView = window.contentView;
-                        debugLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(16, mainView.bounds.size.height - 120, 400, 100)];
-                        [debugLabel setEditable:NO];
-                        [debugLabel setSelectable:NO];
-                        [debugLabel setDrawsBackground:NO];
-                        [debugLabel setBordered:NO];
-                        [debugLabel setWantsLayer:YES];
-                        [debugLabel setAutoresizingMask:NSViewMaxXMargin | NSViewMinYMargin];
-                        [mainView addSubview:debugLabel];
-                    }
-                }
-
-                if (debugLabel) {
-                    [debugLabel setHidden:NO];
-
-                    // BUild the core text block
-                    NSString *text = [NSString stringWithFormat:@"X: %.2f\nY: %.2f\nZ: %.2f\nSpeed: %.3f\nAccel: ",
-                                      px, py, pz, currentSpeed];
-
-                    NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:text];
-                    [attrStr addAttribute:NSForegroundColorAttributeName value:[NSColor whiteColor] range:NSMakeRange(0, text.length)];
-                    [attrStr addAttribute:NSFontAttributeName value:[NSFont fontWithName:@"Menlo" size:14.0f] range:NSMakeRange(0, text.length)];
-
-                    // Color-code Acceleration
-                    NSString *stateText = m_isAccelerating ? @"ON" : @"OFF";
-                    NSColor * stateColor = m_isAccelerating ? [NSColor greenColor] : [NSColor redColor];
-
-                    NSAttributedString *stateStr = [[NSAttributedString alloc] initWithString:stateText
-                        attributes:@{NSForegroundColorAttributeName: stateColor, NSFontAttributeName: [NSFont fontWithName:@"Menlo-Bold" size:14.0f]}];
-
-                    [attrStr appendAttributedString:stateStr];
-                    [debugLabel setAttributedStringValue:attrStr];
-                }
-            } else {
-                // Instantly hide overlay if turned off
-                if (debugLabel) {
-                    [debugLabel setHidden:YES];
-                }
-            }
-        });
-
-
-
         // Grab the inverse matrix to physically shift the universe around the player
         vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();
 
         float screenW = (float)drawable.texture.width;
         float screenH = (float)drawable.texture.height > 0 ? (float)drawable.texture.height : 1.0f;
-        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(screenW, screenH, 1500.0f, 0.1f, 100.0f);
+        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(screenW, screenH, 1500.0f, 0.1f, 200.0f);
 
 
         // 3. Prepping the GPU Pipeline
@@ -1002,19 +938,38 @@ namespace vuron {
         }
 
         // Optimization: Only draw if the floor is within 100 units
-        if (camera.position.y - shadowY <= 100.0f && shadowY != -9999.0f)
+        if (camera.position.y - shadowY <= 200.0f && shadowY != -9999.0f)
+        if (camera.position.y - shadowY <= 200.0f && shadowY != -9999.0f)
         {
             drawShadow = true;
         }
 
         // ===========================================================
 
+
+        // ========================================
+        // -- Frustum Culling Algorithm --
+        // ========================================
+        // Generate the view-projection matrix once, and extract the 6 vision planes
+        vuron::Matrix4x4 viewProj = viewMatrix * projectionMatrix;
+        vuron::Frustum camFrustum = vuron::Frustum::extract(viewProj);
+
+        int renderedObjectCount = 0; // Keep track of how many objects on screen
+
         // 4. The Rendering loop (every entity drawn independently)
         for (size_t i = 0; i < m_cubes.size(); ++i) {
 
+            // Check if the object is visible BEFORE the math
+            if (!m_cubes[i].getHitbox().isOnScreen(camFrustum))
+            {
+                continue; // Skip the object entirely
+            }
+
+            renderedObjectCount++; // Increment if on screen
+
             // Calculate this specific cube's final matrix
             vuron::Matrix4x4 modelMatrix = m_cubes[i].getModelMatrix();
-            vuron::Matrix4x4 mvpMatrix = modelMatrix * viewMatrix * projectionMatrix;
+            vuron::Matrix4x4 mvpMatrix = modelMatrix * viewProj;
 
             // Inject the matrix directly into GPU Register slot 1
             [encoder setVertexBytes:&mvpMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
@@ -1092,6 +1047,70 @@ namespace vuron {
                             indexType:MTLIndexTypeUInt16
                             indexBuffer:(id<MTLBuffer>)m_indexBuffer
                             indexBufferOffset:132];
+
+        // ===========================================
+        // -= 6. Debug Menu =-
+        // ===========================================
+        static NSTextField* debugLabel = nil;
+
+        // 1. Capture the exact variables we need
+        bool showMenu = m_showDebugMenu;
+        float px = camera.position.x;
+        float py = camera.position.y;
+        float pz = camera.position.z;
+        float currentSpeed = m_currentMomentum;
+        bool isAccel = m_isAccelerating;
+        int renderCount = renderedObjectCount;
+        int totalCount = (int)m_cubes.size();
+
+        // 2. Throw the UI drawing logic over to the main thread
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (showMenu) {
+                // Lazy Initialization
+                if (!debugLabel) {
+                    NSWindow *window = [NSApp mainWindow];
+                    if (!window) window = [NSApp keyWindow]; // Fallback if mainWindow isn't set yet
+                    if (window) {
+                        NSView*mainView = window.contentView;
+                        debugLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(16, mainView.bounds.size.height - 120, 400, 100)];
+                        [debugLabel setEditable:NO];
+                        [debugLabel setSelectable:NO];
+                        [debugLabel setDrawsBackground:NO];
+                        [debugLabel setBordered:NO];
+                        [debugLabel setWantsLayer:YES];
+                        [debugLabel setAutoresizingMask:NSViewMaxXMargin | NSViewMinYMargin];
+                        [mainView addSubview:debugLabel];
+                    }
+                }
+
+                if (debugLabel) {
+                    [debugLabel setHidden:NO];
+
+                    // BUild the core text block
+                    NSString *text = [NSString stringWithFormat:@"X: %.2f\nY: %.2f\nZ: %.2f\nSpeed: %.3f\nRendered: %d / %d\nAccel: ",
+                                      px, py, pz, currentSpeed, renderCount, totalCount];
+
+                    NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:text];
+                    [attrStr addAttribute:NSForegroundColorAttributeName value:[NSColor whiteColor] range:NSMakeRange(0, text.length)];
+                    [attrStr addAttribute:NSFontAttributeName value:[NSFont fontWithName:@"Menlo" size:14.0f] range:NSMakeRange(0, text.length)];
+
+                    // Color-code Acceleration
+                    NSString *stateText = m_isAccelerating ? @"ON" : @"OFF";
+                    NSColor * stateColor = m_isAccelerating ? [NSColor greenColor] : [NSColor redColor];
+
+                    NSAttributedString *stateStr = [[NSAttributedString alloc] initWithString:stateText
+                        attributes:@{NSForegroundColorAttributeName: stateColor, NSFontAttributeName: [NSFont fontWithName:@"Menlo-Bold" size:14.0f]}];
+
+                    [attrStr appendAttributedString:stateStr];
+                    [debugLabel setAttributedStringValue:attrStr];
+                }
+            } else {
+                // Instantly hide overlay if turned off
+                if (debugLabel) {
+                    [debugLabel setHidden:YES];
+                }
+            }
+        });
       }
 
       [encoder endEncoding];

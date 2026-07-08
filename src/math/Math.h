@@ -31,19 +31,6 @@ namespace vuron
         return a.x * b.x + a.y * b.y + a.z * b.z;
     }
 
-    // An Axis-Aligned Bounding Box (AABB) / Rigid Body
-    struct AABB {
-        Vector3 min; // Bottom-Left-Back corner
-        Vector3 max; // Top-Right-Front corner
-
-        // The master collision check; Returns tru if 2 hitboxes overlap
-        static bool checkCollision(const AABB& a, const AABB& b) {
-            return (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
-                   (a.min.y <= b.max.y && a.max.y >= b.min.y) &&
-                   (a.min.z <= b.max.z && a.max.z >= b.min.z);
-        }
-    };
-
     // a 4x4 Matrix for 3D transformations
     struct Matrix4x4
     {
@@ -192,6 +179,90 @@ namespace vuron
                 }
             }
             return result;
+        }
+    };
+
+    // A single flat infinite plane used to slice camera vision
+    struct FrustumPlane
+    {
+        Vector3 normal = {0.0f, 0.0f, 0.0f};
+        float distance = 0.0f;
+
+        void normalize()
+        {
+            float mag = std::sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+            normal.x /= mag;
+            normal.y /= mag;
+            normal.z /= mag;
+            distance /= mag;
+        }
+    };
+
+    // The 6-sided 3D cone representing exactly what the camera can see, and nothing else
+    struct Frustum
+    {
+        FrustumPlane planes[6];
+
+        // Exctracts the vision cone directly from the View-projection matrix
+        static Frustum extract(const Matrix4x4& vp)
+        {
+            Frustum f;
+
+            // Left & Right (w + x, w - x)
+            f.planes[0] = {{vp.m[0][3] + vp.m[0][0], vp.m[1][3] + vp.m[1][0], vp.m[2][3] + vp.m[2][0]}, vp.m[3][3] + vp.m[3][0]};
+            f.planes[1] = {{vp.m[0][3] - vp.m[0][0], vp.m[1][3] - vp.m[1][0], vp.m[2][3] - vp.m[2][0]}, vp.m[3][3] - vp.m[3][0]};
+
+            // Bottom & Top (w + y, w - y)
+            f.planes[2] = {{vp.m[0][3] + vp.m[0][1], vp.m[1][3] + vp.m[1][1], vp.m[2][3] + vp.m[2][1]}, vp.m[3][3] + vp.m[3][1]};
+            f.planes[3] = {{vp.m[0][3] - vp.m[0][1], vp.m[1][3] - vp.m[1][1], vp.m[2][3] - vp.m[2][1]}, vp.m[3][3] - vp.m[3][1]};
+
+            // Near & Far (Apple Metal uses 0 to 1 depth, not -1 to 1)
+            // Near: z > 0
+            f.planes[4] = {{vp.m[0][2], vp.m[1][2], vp.m[2][2]}, vp.m[3][2]};
+            // Far: w - z > 0
+            f.planes[5] = {{vp.m[0][3] - vp.m[0][2], vp.m[1][3] - vp.m[1][2], vp.m[2][3] - vp.m[2][2]}, vp.m[3][3] - vp.m[3][2]};
+
+            for (int i = 0; i < 6; i++)
+            {
+                f.planes[i].normalize();
+            }
+            return f;
+        }
+    };
+
+    // An Axis-Aligned Bounding Box (AABB) / Rigid Body
+    struct AABB {
+        Vector3 min; // Bottom-Left-Back corner
+        Vector3 max; // Top-Right-Front corner
+
+        // The master collision check; Returns tru if 2 hitboxes overlap
+        static bool checkCollision(const AABB& a, const AABB& b) {
+            return (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+                   (a.min.y <= b.max.y && a.max.y >= b.min.y) &&
+                   (a.min.z <= b.max.z && a.max.z >= b.min.z);
+        }
+
+        // Checks if this bounding box is on screen
+        bool isOnScreen(const Frustum& frustum) const
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                // Find the corner of the box closest to the plane
+                Vector3 p = min;
+                if (frustum.planes[i].normal.x >= 0.0f) p.x = max.x;
+                if (frustum.planes[i].normal.y >= 0.0f) p.y = max.y;
+                if (frustum.planes[i].normal.z >= 0.0f) p.z = max.z;
+
+                // If that closest corner is behind the plane, the entire object is invisible
+                if ((frustum.planes[i].normal.x * p.x +
+                     frustum.planes[i].normal.y * p.y +
+                     frustum.planes[i].normal.z * p.z +
+                     frustum.planes[i].distance) < 0.0f)
+                     {
+                        return false;
+                     }
+            }
+            return true;
         }
     };
 
