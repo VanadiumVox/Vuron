@@ -266,6 +266,44 @@ namespace vuron
         }
     };
 
+    // A math line used for hitscan weapons
+    struct Ray
+    {
+        Vector3 origin;
+        Vector3 direction;
+
+        // The Slab Method: Calculates if and where a ray pierces a bounding box
+        float intersects(const AABB& box) const
+        {
+            float dirX = direction.x == 0.0f ? 0.00001f : direction.x;
+            float dirY = direction.y == 0.0f ? 0.00001f : direction.y;
+            float dirZ = direction.z == 0.0f ? 0.00001f : direction.z;
+
+            float tmin = (box.min.x - origin.x) / dirX;
+            float tmax = (box.max.x - origin.x) / dirX;
+            if (tmin > tmax) { float temp = tmin; tmin = tmax; tmax = temp; }
+
+            float tymin = (box.min.y - origin.y) / dirY;
+            float tymax = (box.max.y - origin.y) / dirY;
+            if (tymin > tymax) { float temp = tymin; tymin = tymax; tymax = temp; }
+
+            if ((tmin > tmax) || (tymin > tmax)) return -1.0f;
+            if (tymin > tmin) tmin = tymin;
+            if (tymax < tmax) tmax = tymax;
+
+            float tzmin = (box.min.z - origin.z) / dirZ;
+            float tzmax = (box.max.z - origin.z) / dirZ;
+            if (tzmin > tzmax) { float temp = tzmin; tzmin = tzmax; tzmax = temp; }
+
+            if ((tmin > tmax) || (tzmin > tmax)) return -1.0f;
+            if (tzmin > tmin) tmin = tzmin;
+            if (tzmax < tmax) tmax = tzmax;
+
+            if (tmin < 0.0f) return -1.0f;
+            return tmin;
+        }
+    };
+
     enum class ShapeType
     {
         CUBE,
@@ -352,14 +390,34 @@ namespace vuron
         float pitch = 0.0f; // Looking up and down
         float yaw = 0.0f; // Looking left and right
 
-        // Tracks vertical momentum
-        float velocityY = 0.0f;
+        // Tracks the player's 3D Momentum
+        Vector3 velocity = {0.0f, 0.0f, 0.0f};
 
         bool isCrouched = false;
 
         // Physical state trackers
         bool isGrounded = false;
         bool crouchedMidAir = false; // The strict rocket jump lock
+
+        // Grappling Hook State
+        bool isGrappling = false;
+        Vector3 grapplePoint = {0.0f, 0.0f, 0.0f};
+        int hookedEntityIndex = -1;
+
+        // The Air-charge system for grappling hook
+        int maxAirGrapples = 2;
+        int currentAirGrapples = 2;
+
+        // Converts the camera's Pitch and Yaw into a normal vector
+        Vector3 getForwardVector() const
+        {
+            return
+            {
+                std::sin(yaw) * std::cos(pitch),
+                -std::sin(pitch),
+                std::cos(yaw) * std::cos(pitch)
+            };
+        }
 
         // The Player's hitbox
         AABB getHitbox() const {

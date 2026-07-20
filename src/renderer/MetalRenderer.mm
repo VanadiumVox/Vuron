@@ -71,9 +71,20 @@ namespace vuron {
     // ---------------------------------------------------------
 
     // -=Mouse input bridge=-
-    void MetalRenderer::addMouseDelta(float dx, float dy) {
+    void MetalRenderer::addMouseDelta(float dx, float dy)
+    {
         m_mouseDeltaX += dx;
         m_mouseDeltaY += dy;
+    }
+
+    // -=Mouse Click bridge=-
+    void MetalRenderer::setMouseState(bool isPressed)
+    {
+        if (isPressed && !m_mouseLeftDown)
+        {
+            m_mouseJustClicked = true; // Captures the frame it was clicked
+        }
+        m_mouseLeftDown = isPressed;
     }
 
     // ==========================================
@@ -494,6 +505,70 @@ namespace vuron {
         // -= Unified Physics and Movement Engine =-
         // ===============================================
         float speed = 0.1f;
+
+        // --- The Grappling Hook logic (yeah, I know, it's weird up here too but makes sense) ---
+        // Inputs are consumed instantly, no queues
+        if (m_mouseJustClicked)
+        {
+            m_mouseJustClicked = false; // Consume the click
+
+            if (!camera.isGrappling)
+            {
+                // Deny firing midair if no charges left
+                if (!camera.isGrounded && camera.currentAirGrapples <= 0)
+                {
+                    // Do nothing
+                }
+                else
+                {
+                    // Generate a ray from the player's eye, shooting straight forward.
+                    vuron::Ray grappleRay = { camera.position, camera.getForwardVector() };
+
+                    float closestHit = 9999.0f;
+                    int hitTarget = -1;
+
+                    // Scan the world to find the closest pierce point
+                    for (size_t i = 0; i < m_cubes.size(); ++i)
+                    {
+                        float hitDistance = grappleRay.intersects(m_cubes[i].getHitbox());
+
+                        // Valid hit must be in front of camera.
+                        if (hitDistance > 0.1f && hitDistance < closestHit)
+                        {
+                            closestHit = hitDistance;
+                            hitTarget = (int)i;
+                        }
+                    }
+
+                    // Locking the state machine
+                    if (hitTarget != -1)
+                    {
+                        camera.isGrappling = true;
+                        camera.hookedEntityIndex = hitTarget;
+
+                        // Projecting the ray endpoints to get the final coordinate
+                        camera.grapplePoint =
+                        {
+                            grappleRay.origin.x + (grappleRay.direction.x * closestHit),
+                            grappleRay.origin.y + (grappleRay.direction.y * closestHit),
+                            grappleRay.origin.z + (grappleRay.direction.z * closestHit)
+                        };
+
+                        // Midair use consumes an air charge
+                        if (!camera.isGrounded)
+                        {
+                            camera.currentAirGrapples--;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // if already grappling, a second click detaches
+                camera.isGrappling = false;
+            }
+        }
+
         // Trigonometry: Calculate exatly which way "Forwards" and "Right" are based on player's yaw
         float fwdX = std::sin(camera.yaw);
         float fwdZ = std::cos(camera.yaw);
@@ -654,17 +729,102 @@ namespace vuron {
         float fastFallGravity = -0.025f;
 
         float currentGravity = baseGravity;
-        if (camera.velocityY > 0.0f && !m_keySpace) currentGravity = heavyGravity;
-        else if (camera.velocityY < 0.0f && m_keyShift) currentGravity = fastFallGravity;
-        else if (camera.velocityY < 0.0f && m_keySpace) currentGravity = floatGravity;
+        if (camera.velocity.y > 0.0f && !m_keySpace) currentGravity = heavyGravity;
+        else if (camera.velocity.y < 0.0f && m_keyShift) currentGravity = fastFallGravity;
+        else if (camera.velocity.y < 0.0f && m_keySpace) currentGravity = floatGravity;
 
-        camera.velocityY += currentGravity;
+        camera.velocity.y += currentGravity;
 
         // ===================================================
         // -= 3. Unified Vector Physics & Clipping =-
         // ===================================================
 
-        vuron::Vector3 vel = {moveX, camera.velocityY, moveZ};
+        // --- Pendulum Math & Tension ---
+        // 1. Combining intent with velocity to get momentum
+        float totalVx = moveX + camera.velocity.x;
+        float totalVy = camera.velocity.y;
+        float totalVz = moveZ + camera.velocity.z;
+
+        if (camera.isGrappling)
+        {
+            // Camera 3D Vector to the hook point
+            float dx = camera.grapplePoint.x - camera.position.x;
+            float dy = camera.grapplePoint.y - camera.position.y;
+            float dz = camera.grapplePoint.z - camera.position.z;
+
+            // Pythagoras (my math teacher was right.)
+            float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+            if (distance > 0.0f)
+            {
+                // Normalize the direction to the hook
+                float nx = dx / distance;
+                float ny = dy / distance;
+                float nz = dz / distance;
+
+                if (camera.isGrounded && ny > 0.1f)
+                {
+                    totalVy += 0.08f;
+                    camera.isGrounded = false;
+                }
+
+                // 2. Tension: Project velocity to delete movement away from the pivot
+                float velocityAway = (totalVx * -nx) + (totalVy * -ny) + (totalVz * -nz);
+
+                if (velocityAway > 0)
+                {
+                    totalVx += nx * velocityAway;
+                    totalVy += ny * velocityAway;
+                    totalVz += nz * velocityAway;
+                }
+
+                // Radius-based dampening
+                if (distance < 4.0f)
+                {
+                    // Dampen curve: 0.0 (center) to 1.0 (edge of deadzone)
+                    float dampen = distance / 4.0f;
+                    // Heavily multiply the velocity by smaller numbers as you aproach the point
+                    float friction = 0.85f + (0.10f * dampen);
+
+                    totalVx *= friction;
+                    totalVy *= friction;
+                    totalVz *= friction;
+                }
+                else
+                {
+                    // Standard air resistance for larger, wider swings
+                    totalVx *= 0.995f;
+                    totalVy *= 0.995f;
+                    totalVz *= 0.995f;
+                }
+
+                // 3. The auto-retract (towards the anchor point)
+                float retractSpeed = 0.05f;
+                totalVx += nx * retractSpeed;
+                totalVy += ny * retractSpeed;
+                totalVz += nz * retractSpeed;
+            }
+
+            // 4. Extract the orbital physics back out to separate it from WASD movement
+            camera.velocity.x = totalVx - moveX;
+            camera.velocity.y = totalVy;
+            camera.velocity.z = totalVz - moveZ;
+        }
+        else
+        {
+            // Air friction: If we aren't grappling, slowly decay existing orbital momentum
+            camera.velocity.x *= 0.95f;
+            camera.velocity.z *= 0.95f;
+
+            // Recalculating the totals using the decayed momentum
+            totalVx = moveX + camera.velocity.x;
+            totalVz = moveZ + camera.velocity.z;
+        }
+
+        // ----------------------------------------------------
+
+        // Apply everything to the final velocity vector
+        vuron::Vector3 vel = {totalVx, camera.velocity.y, totalVz};
         float currentHeight = camera.isCrouched ? 1.5f : 2.0f;
         camera.isGrounded = false;
 
@@ -732,7 +892,13 @@ namespace vuron {
                 {
                     camera.position.y = m_cubes[i].getHitbox().max.y + currentHeight + 0.001f;
                     camera.isGrounded = true;
+                    camera.currentAirGrapples = camera.maxAirGrapples;
                     camera.crouchedMidAir = false;
+
+                    // Geometry Cleanup
+                    // Friction: Stops infinite sliding, but doesn't force-detach the grapple
+                    camera.velocity.x *= 0.5f;
+                    camera.velocity.z *= 0.5f;
                 }
                 else if (vel.y > 0.0f) // Ceiling
                 {
@@ -796,6 +962,9 @@ namespace vuron {
                         {
                             camera.isGrounded = true;
                             camera.crouchedMidAir = false;
+
+                            // FIX: Restore air charges when landing on a ramp
+                            camera.currentAirGrapples = camera.maxAirGrapples;
                         }
                     }
                 }
@@ -815,7 +984,7 @@ namespace vuron {
 
         // Otherwise, leave m_currentMomentum along. Don't let wall friction shrink the throttle.baseSpeed
 
-        camera.velocityY = vel.y;
+        camera.velocity.y = vel.y;
 
 
         // ===================================================================
@@ -845,7 +1014,7 @@ namespace vuron {
 
                 }
 
-                camera.velocityY = jumpForce;
+                camera.velocity.y = jumpForce;
                 m_hasJumped = true;
                 m_jumpBuffer = 0; // Consume the buffer so no double trigger
             }
@@ -862,10 +1031,10 @@ namespace vuron {
                 // Condition 3: Have they not already RJumped?
                 // Condition 4: Is their vertical velocity floating around 0.0f?
                 if (camera.isCrouched && camera.crouchedMidAir && !m_hasRocketJumped &&
-                    camera.velocityY <= peakWindow && camera.velocityY >= -peakWindow)
+                    camera.velocity.y <= peakWindow && camera.velocity.y >= -peakWindow)
                     {
                         // Kaboom.
-                        camera.velocityY = rocketForce;
+                        camera.velocity.y = rocketForce;
                         m_hasRocketJumped = true; // Locking RJump
                         m_hasJumped = true;
                     }
@@ -1058,10 +1227,11 @@ namespace vuron {
         float px = camera.position.x;
         float py = camera.position.y;
         float pz = camera.position.z;
-        float currentSpeed = m_currentMomentum;
+        float currentSpeed = std::sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
         bool isAccel = m_isAccelerating;
         int renderCount = renderedObjectCount;
         int totalCount = (int)m_cubes.size();
+        int grappleCharges = camera.currentAirGrapples;
 
         // 2. Throw the UI drawing logic over to the main thread
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -1072,7 +1242,7 @@ namespace vuron {
                     if (!window) window = [NSApp keyWindow]; // Fallback if mainWindow isn't set yet
                     if (window) {
                         NSView*mainView = window.contentView;
-                        debugLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(16, mainView.bounds.size.height - 120, 400, 100)];
+                        debugLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(16, mainView.bounds.size.height - 140, 400, 140)];
                         [debugLabel setEditable:NO];
                         [debugLabel setSelectable:NO];
                         [debugLabel setDrawsBackground:NO];
@@ -1087,8 +1257,8 @@ namespace vuron {
                     [debugLabel setHidden:NO];
 
                     // BUild the core text block
-                    NSString *text = [NSString stringWithFormat:@"X: %.2f\nY: %.2f\nZ: %.2f\nSpeed: %.3f\nRendered: %d / %d\nAccel: ",
-                                      px, py, pz, currentSpeed, renderCount, totalCount];
+                    NSString *text = [NSString stringWithFormat:@"X: %.2f\nY: %.2f\nZ: %.2f\nSpeed: %.3f\nRendered: %d / %d\nGrapples: %d\nAccel: ",
+                                      px, py, pz, currentSpeed, renderCount, totalCount, grappleCharges];
 
                     NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:text];
                     [attrStr addAttribute:NSForegroundColorAttributeName value:[NSColor whiteColor] range:NSMakeRange(0, text.length)];

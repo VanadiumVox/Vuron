@@ -104,7 +104,8 @@ namespace vuron
     }
 
     //Update function *VERY IMPORTANT*
-    void MacWindow::update() {
+    void MacWindow::update()
+    {
 
       // This pool prevents OS window events from leaking memory every frame
       @autoreleasepool {
@@ -123,12 +124,14 @@ namespace vuron
         bool handled = false;
 
         // -=Raw hardware input interception=-
-        if (event.type == NSEventTypeKeyDown) {
+        if (event.type == NSEventTypeKeyDown)
+        {
             // Convert the keystroke into a string
             NSString* chars = [[event charactersIgnoringModifiers] lowercaseString];
 
             // Engine Killswitch (cmd + q)
-            if ([chars isEqualToString:@"q"] && ([event modifierFlags] & NSEventModifierFlagCommand)) {
+            if ([chars isEqualToString:@"q"] && ([event modifierFlags] & NSEventModifierFlagCommand))
+            {
                 exit(0);
             }
 
@@ -139,14 +142,23 @@ namespace vuron
             if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', true); handled = true;}
             if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', true); handled = true;}
             if ([chars isEqualToString:@"r"]) {m_renderer->setKeyState('r', true); handled = true;}
+
             NSString *unmodifiedChars = [[event charactersIgnoringModifiers] lowercaseString];
-            if ([unmodifiedChars isEqualToString:@"v"] && ([event modifierFlags] & NSEventModifierFlagControl)) {
+            if ([unmodifiedChars isEqualToString:@"v"] && ([event modifierFlags] & NSEventModifierFlagControl))
+            {
                 m_renderer->toggleDebugMenu();
                 handled = true;
             }
         }
+        // Raw Mouse Left click pressed : Grappling hook fired (for now)
+        else if (event.type == NSEventTypeLeftMouseDown)
+        {
+            m_renderer->setMouseState(true); // Left button pressed
+            handled = true;
+        }
         // When the key is released, stop movement instantly
-        else if (event.type == NSEventTypeKeyUp) {
+        else if (event.type == NSEventTypeKeyUp)
+        {
             NSString* chars = [[event charactersIgnoringModifiers] lowercaseString];
             if ([chars isEqualToString:@"w"]) {m_renderer->setKeyState('w', false); handled = true;}
             if ([chars isEqualToString:@"a"]) {m_renderer->setKeyState('a', false); handled = true;}
@@ -155,8 +167,17 @@ namespace vuron
             if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', false); handled = true;}
             if ([chars isEqualToString:@"r"]) {m_renderer->setKeyState('r', false); handled = true;}
         }
+
+        // Raw Left Mouse Up; detach grapple
+        else if(event.type == NSEventTypeLeftMouseUp)
+        {
+            m_renderer->setMouseState(false); // Left click released
+            handled = true;
+        }
+
         // Raw Mouse Intercept
-        else if (event.type == NSEventTypeMouseMoved || event.type == NSEventTypeLeftMouseDragged || event.type == NSEventTypeRightMouseDragged) {
+        else if (event.type == NSEventTypeMouseMoved || event.type == NSEventTypeLeftMouseDragged || event.type == NSEventTypeRightMouseDragged)
+        {
             // Read the raw physical delta from the hardware laser
             float dx = [event deltaX];
             float dy = [event deltaY];
@@ -167,7 +188,8 @@ namespace vuron
         // --------------------------
 
         // --Modifier Key Intercept-- (Shift key)
-        else if (event.type == NSEventTypeFlagsChanged) {
+        else if (event.type == NSEventTypeFlagsChanged)
+        {
             // Check if the shift key is pressed
             bool isShift = ([event modifierFlags] & NSEventModifierFlagShift) != 0;
 
@@ -177,7 +199,8 @@ namespace vuron
         }
         // Send the event to the OS to handle basic events like moving the window
         // Only send the event to the OS if Vuron didn't need it
-        if (!handled) {
+        if (!handled)
+        {
             [NSApp sendEvent:event];
         }
       }

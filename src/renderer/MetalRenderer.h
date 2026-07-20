@@ -33,6 +33,9 @@ namespace vuron
         // Debug menu toggle
         void toggleDebugMenu() { m_showDebugMenu = !m_showDebugMenu; }
 
+        // For the grappling hook
+        void setMouseState(bool isPressed);
+
         private:
         void* m_device; // id<MTLDevice>
         void* m_commandQueue; // id<MTLCommandQueue>
@@ -89,6 +92,10 @@ namespace vuron
         int m_boostHangTimer = 0;
         bool m_isBoosting = false;
         int m_jumpBuffer = 0;
+
+        // Grappling hook trackers (for the time being)
+        bool m_mouseLeftDown = false;
+        bool m_mouseJustClicked = false;
 
     };
 }
