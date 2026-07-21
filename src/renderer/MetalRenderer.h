@@ -36,6 +36,9 @@ namespace vuron
         // For the grappling hook
         void setMouseState(bool isPressed);
 
+        // For Hitbox Debugging
+        void toggleBoundingBoxes() { m_showBoundingBoxes = !m_showBoundingBoxes; }
+
         private:
         void* m_device; // id<MTLDevice>
         void* m_commandQueue; // id<MTLCommandQueue>
@@ -96,6 +99,9 @@ namespace vuron
         // Grappling hook trackers (for the time being)
         bool m_mouseLeftDown = false;
         bool m_mouseJustClicked = false;
+
+        // Hitbox debugging
+        bool m_showBoundingBoxes = false;
 
     };
 }

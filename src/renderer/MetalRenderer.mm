@@ -299,7 +299,27 @@ namespace vuron {
              {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
              {{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
              {{-0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
-             {{ 0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}}
+             {{ 0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+
+             // --- GREEN VISUAL BOX (Vertices 22-29) ---
+             {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+             {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+             {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+             {{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
+             {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
+             {{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
+             {{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
+
+             // --- RED PHYSICAL BOX (Vertices 30-37) ---
+             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+             {{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+             {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+             {{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+             {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+             {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+             {{-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+             {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}}
        };
 
        uint16_t allIndices[] =
@@ -323,19 +343,29 @@ namespace vuron {
            14, 16, 15,  15, 16, 17,
 
            // --- Crosshair Indices (66 to 71) ---
-           18, 20, 19,  19, 20, 21
+           18, 20, 19,  19, 20, 21,
+
+           // --- Green Visual Wireframe (72 to 95) ---
+           22,23, 23,25, 25,24, 24,22, // Front
+           26,27, 27,29, 29,28, 28,26, // Back
+           22,26, 23,27, 24,28, 25,29, // Connections
+
+           // --- Red Physical Wireframe (96 to 119) ---
+           30,31, 31,33, 33,32, 32,30, // Front
+           34,35, 35,37, 37,36, 36,34, // Back
+           30,34, 31,35, 32,36, 33,37  // Connections
        };
 
 
       // 1. Sending 14 points to the GPU
       id<MTLBuffer> vertexBuffer = [device newBufferWithBytes:allVertices
-                                    length:(sizeof(vuron::Vertex) * 22)
+                                    length:(sizeof(vuron::Vertex) * 38)
                                     options:MTLResourceStorageModeShared];
       m_vertexBuffer = (void*)vertexBuffer;
 
       //2. Sending instruction map to the GPU
       id<MTLBuffer> indexBuffer = [device newBufferWithBytes:allIndices
-                                    length:(sizeof(uint16_t) * 72)
+                                    length:(sizeof(uint16_t) * 120)
                                     options:MTLResourceStorageModeShared];
       m_indexBuffer = (void*)indexBuffer;
 
@@ -1162,6 +1192,54 @@ namespace vuron {
                                 indexBufferOffset:72];
             }
         }
+
+        // ===========================================
+        // 4.5 Draw Bounding box Wireframe
+        // ===========================================
+        if (m_showBoundingBoxes)
+        {
+            for (size_t i = 0; i < m_cubes.size(); ++i)
+            {
+                // Ignore culled objects
+                if (!m_cubes[i].getHitbox().isOnScreen(camFrustum)) continue;
+
+                // 1. Visual Bounding box (Green)
+                // Represents the exact transformation applied
+                vuron::Matrix4x4 visualModel = m_cubes[i].getModelMatrix();
+                vuron::Matrix4x4 visualMVP = visualModel * viewProj;
+
+                [encoder setVertexBytes:&visualMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
+                [encoder drawIndexedPrimitives:MTLPrimitiveTypeLine
+                                    indexCount:24
+                                    indexType: MTLIndexTypeUInt16
+                                    indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                                    indexBufferOffset:144]; // offset exactly by 144 (72 indices * 2)
+
+                // 2. Physical Hitbox (Red)
+                // represents the raw AABB.
+                vuron::AABB box = m_cubes[i].getHitbox();
+
+                // Calculate AABB center and exact physical span
+                float cx = (box.min.x + box.max.x) * 0.5f;
+                float cy = (box.min.y + box.max.y) * 0.5f;
+                float cz = (box.min.z + box.max.z) * 0.5f;
+                float sx = box.max.x - box.min.x;
+                float sy = box.max.y - box.min.y;
+                float sz = box.max.z - box.min.z;
+
+                // Consturct a raw translation/scale matrix, with 0 rotation
+                vuron::Matrix4x4 physModel = vuron::Matrix4x4::scale(sx, sy, sz) * vuron::Matrix4x4::translation(cx, cy, cz);
+                vuron::Matrix4x4 physMVP = physModel * viewProj;
+
+                [encoder setVertexBytes:&physMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
+                [encoder drawIndexedPrimitives:MTLPrimitiveTypeLine
+                                    indexCount:24
+                                    indexType: MTLIndexTypeUInt16
+                                    indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                                    indexBufferOffset:192]; // Offset at 192 (96 indices * 2)
+            }
+        }
+        // ===========================================
 
         // 5. Draw the Shadow (on top of the rest)
         if (drawShadow)

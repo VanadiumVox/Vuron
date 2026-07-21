@@ -144,9 +144,16 @@ namespace vuron
             if ([chars isEqualToString:@"r"]) {m_renderer->setKeyState('r', true); handled = true;}
 
             NSString *unmodifiedChars = [[event charactersIgnoringModifiers] lowercaseString];
+            // Debug menu toggle (ctrl + v)
             if ([unmodifiedChars isEqualToString:@"v"] && ([event modifierFlags] & NSEventModifierFlagControl))
             {
                 m_renderer->toggleDebugMenu();
+                handled = true;
+            }
+            // Bounding Box debug toggle (ctrl + b)
+            if ([unmodifiedChars isEqualToString:@"b"] && ([event modifierFlags] & NSEventModifierFlagControl))
+            {
+                m_renderer->toggleBoundingBoxes();
                 handled = true;
             }
         }
