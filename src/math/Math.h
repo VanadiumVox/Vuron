@@ -266,44 +266,6 @@ namespace vuron
         }
     };
 
-    // A math line used for hitscan weapons
-    struct Ray
-    {
-        Vector3 origin;
-        Vector3 direction;
-
-        // The Slab Method: Calculates if and where a ray pierces a bounding box
-        float intersects(const AABB& box) const
-        {
-            float dirX = direction.x == 0.0f ? 0.00001f : direction.x;
-            float dirY = direction.y == 0.0f ? 0.00001f : direction.y;
-            float dirZ = direction.z == 0.0f ? 0.00001f : direction.z;
-
-            float tmin = (box.min.x - origin.x) / dirX;
-            float tmax = (box.max.x - origin.x) / dirX;
-            if (tmin > tmax) { float temp = tmin; tmin = tmax; tmax = temp; }
-
-            float tymin = (box.min.y - origin.y) / dirY;
-            float tymax = (box.max.y - origin.y) / dirY;
-            if (tymin > tymax) { float temp = tymin; tymin = tymax; tymax = temp; }
-
-            if ((tmin > tmax) || (tymin > tmax)) return -1.0f;
-            if (tymin > tmin) tmin = tymin;
-            if (tymax < tmax) tmax = tymax;
-
-            float tzmin = (box.min.z - origin.z) / dirZ;
-            float tzmax = (box.max.z - origin.z) / dirZ;
-            if (tzmin > tzmax) { float temp = tzmin; tzmin = tzmax; tzmax = temp; }
-
-            if ((tmin > tmax) || (tzmin > tmax)) return -1.0f;
-            if (tzmin > tmin) tmin = tzmin;
-            if (tzmax < tmax) tmax = tzmax;
-
-            if (tmin < 0.0f) return -1.0f;
-            return tmin;
-        }
-    };
-
     enum class ShapeType
     {
         CUBE,
@@ -378,6 +340,119 @@ namespace vuron
             // Order matters a LOT here.
             // Scale first, then Rotate, then Translate
             return s * rx * ry * rz * t;
+        }
+    };
+
+    // A math line used for hitscan weapons
+    struct Ray
+    {
+        Vector3 origin;
+        Vector3 direction;
+
+        // The Slab Method: Calculates if and where a ray pierces a bounding box
+        float intersects(const AABB& box) const
+        {
+            float dirX = direction.x == 0.0f ? 0.00001f : direction.x;
+            float dirY = direction.y == 0.0f ? 0.00001f : direction.y;
+            float dirZ = direction.z == 0.0f ? 0.00001f : direction.z;
+
+            float tmin = (box.min.x - origin.x) / dirX;
+            float tmax = (box.max.x - origin.x) / dirX;
+            if (tmin > tmax) { float temp = tmin; tmin = tmax; tmax = temp; }
+
+            float tymin = (box.min.y - origin.y) / dirY;
+            float tymax = (box.max.y - origin.y) / dirY;
+            if (tymin > tymax) { float temp = tymin; tymin = tymax; tymax = temp; }
+
+            if ((tmin > tmax) || (tymin > tmax)) return -1.0f;
+            if (tymin > tmin) tmin = tymin;
+            if (tymax < tmax) tmax = tymax;
+
+            float tzmin = (box.min.z - origin.z) / dirZ;
+            float tzmax = (box.max.z - origin.z) / dirZ;
+            if (tzmin > tzmax) { float temp = tzmin; tzmin = tzmax; tzmax = temp; }
+
+            if ((tmin > tmax) || (tzmin > tmax)) return -1.0f;
+            if (tzmin > tmin) tmin = tzmin;
+            if (tzmax < tmax) tmax = tzmax;
+
+            if (tmin < 0.0f) return -1.0f;
+            return tmin;
+        }
+
+        // Advanced OBB (Oriented Bounding Box)
+        // Converts the ray into the object's local 1x1x1 space to match the Green visual geometry (using ctrl + b)
+        float intersectsOBB(const Transform& t) const
+        {
+            // 1. Inverse Translate
+            Vector3 o = {origin.x - t.position.x, origin.y - t.position.y, origin.z - t.position.z};
+            Vector3 d = direction;
+
+            //Inverse Rotation Helpers
+            auto rotX = [](Vector3 v, float a) -> Vector3
+            {
+                float c = std::cos(a), s = std::sin(a);
+                return {v.x, v.y * c - v.z * s, v.y * s + v.z * c};
+            };
+            auto rotY = [](Vector3 v, float a) -> Vector3
+            {
+                float c = std::cos(a), s = std::sin(a);
+                return {v.x * c + v.z * s, v.y, -v.x * s + v.z * c};
+            };
+            auto rotZ = [](Vector3 v, float a) -> Vector3
+            {
+                float c = std::cos(a), s = std::sin(a);
+                return {v.x * c - v.y * s, v.x * s + v.y * c, v.z};
+            };
+
+            // 2. Inverse Rotate (reverse order: Z, Y, X with negative angles)
+            o = rotZ(o, t.rotation.z); o = rotY(o, -t.rotation.y); o = rotX(o, -t.rotation.x);
+            d = rotZ(d, t.rotation.z); d = rotY(d, -t.rotation.y); d = rotX(d, -t.rotation.x);
+
+            // 3. Inverse Scale
+            o.x /= t.scale.x; o.y /= t.scale.y; o.z /= t.scale.z;
+            d.x /= t.scale.x; d.y /= t.scale.y; d.z /= t.scale.z;
+
+            // 4. The Local Slab Method (Against a perfect 1x1x1 cube)
+            float dirX = d.x == 0.0f ? 0.00001f : d.x;
+            float dirY = d.y == 0.0f ? 0.00001f : d.y;
+            float dirZ = d.z == 0.0f ? 0.00001f : d.z;
+
+            float tmin = (-0.5f - o.x) / dirX;
+            float tmax = (0.5f - o.x) / dirX;
+            if (tmin > tmax) { float temp = tmin; tmin = tmax; tmax = temp; }
+
+            float tymin = (-0.5f - o.y) / dirY;
+            float tymax = (0.5f - o.y) / dirY;
+            if (tymin > tymax) { float temp = tymin; tymin = tymax; tymax = temp; }
+
+            if ((tmin > tymax) || (tymin > tmax)) return -1.0f;
+            if (tymin > tmin) tmin = tymin;
+            if (tymax < tmax) tmax = tymax;
+
+            float tzmin = (-0.5f - o.z) / dirZ;
+            float tzmax = (0.5f - o.z) / dirZ;
+            if (tzmin > tzmax) { float temp = tzmin; tzmin = tzmax; tzmax = temp; }
+
+            if ((tmin > tzmax) || (tzmin > tmax)) return -1.0f;
+            if (tzmin > tmin) tmin = tzmin;
+            if (tzmax < tmax) tmax = tzmax;
+
+            if (tmin < 0.0f) return -1.0f;
+
+            // 5. Advanced Wedge trimming (get it?)
+            if (t.type == ShapeType::WEDGE)
+            {
+                // Calculate exact local hit coordinate
+                Vector3 hitLocal = {o.x + d.x * tmin, o.y + d.y * tmin, o.z + d.z * tmin};
+                // Sloped roof equation in local space: y = -z
+                if (hitLocal.y > -hitLocal.z + 0.01f)
+                {
+                    return -1.0f; // Shot passed through the empty air
+                }
+            }
+
+            return tmin;
         }
     };
 

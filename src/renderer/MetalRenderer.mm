@@ -560,7 +560,7 @@ namespace vuron {
                     // Scan the world to find the closest pierce point
                     for (size_t i = 0; i < m_cubes.size(); ++i)
                     {
-                        float hitDistance = grappleRay.intersects(m_cubes[i].getHitbox());
+                        float hitDistance = grappleRay.intersectsOBB(m_cubes[i]);
 
                         // Valid hit must be in front of camera.
                         if (hitDistance > 0.1f && hitDistance < closestHit)
@@ -833,6 +833,13 @@ namespace vuron {
                 totalVx += nx * retractSpeed;
                 totalVy += ny * retractSpeed;
                 totalVz += nz * retractSpeed;
+
+                // Dampening swing more since holding space fuckin launches ya
+//                 float maxSwingHeight = 0.22f;
+//                 if (totalVy > maxSwingHeight)
+//                 {
+//                     totalVy = maxSwingHeight;
+//                 }
             }
 
             // 4. Extract the orbital physics back out to separate it from WASD movement
