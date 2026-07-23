@@ -283,6 +283,53 @@ namespace vuron
         ShapeType type = ShapeType::CUBE; // Default to a cube
         Vector3 normal = {0.0f, 1.0f, 0.0f}; // Only used if it's a wedge
 
+        // The definition of a flat surface
+        struct Plane
+        {
+            Vector3 normal;
+            float distance;
+        };
+
+        // Dynamically calculates the 5 World-space planes of the wedge, accounting scale and rotation
+        void getWedgePlanes(Plane outPlanes[5]) const
+        {
+            // Helper to map a local vertex into the rotated/scaled World space
+            auto toWorld = [&](Vector3 lp) -> Vector3
+            {
+                Matrix4x4 m = getModelMatrix();
+                return
+                {
+                    lp.x * m.m[0][0] + lp.y * m.m[1][0] + lp.z * m.m[2][0] + m.m[3][0],
+                    lp.x * m.m[0][1] + lp.y * m.m[1][1] + lp.z * m.m[2][1] + m.m[3][1],
+                    lp.x * m.m[0][2] + lp.y * m.m[1][2] + lp.z * m.m[2][2] + m.m[3][2]
+                };
+            };
+
+            // Helper: Uses cross-produce to calculate exactly which way a plane is facing
+            auto makePlane = [&](Vector3 p1, Vector3 p2, Vector3 p3) -> Plane
+            {
+                Vector3 a = {p2.x - p1.x, p2.y - p1.y, p2.z - p1.z};
+                Vector3 b = {p3.x - p1.x, p3.y - p1.y, p3.z - p1.z};
+                Vector3 norm = {a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x};
+
+                float mag = std::sqrt(norm.x*norm.x + norm.y*norm.y + norm.z*norm.z);
+                norm.x /= mag; norm.y /= mag; norm.z /= mag;
+                return {norm, norm.x*p1.x + norm.y*p1.y + norm.z*p1.z};
+            };
+
+            // Calculate the 5 outward facing plaens
+            // 1. Bottom floor
+            outPlanes[0] = makePlane(toWorld({-0.5f, -0.5f, -0.5f}), toWorld({0.5f, -0.5f, -0.5f}), toWorld({0.5f, -0.5f, 0.5f}));
+            // 2. Front flat wall
+            outPlanes[1] = makePlane(toWorld({-0.5f, -0.5f, -0.5f}), toWorld({-0.5f, 0.5f, -0.5f}), toWorld({0.5f, 0.5f, -0.5f}));
+            // 3. Left triangular wall
+            outPlanes[2] = makePlane(toWorld({-0.5f, -0.5f, -0.5f}), toWorld({-0.5f, -0.5f, 0.5f}), toWorld({-0.5f, 0.5f, -0.5f}));
+            // 4. Right triangle wall
+            outPlanes[3] = makePlane(toWorld({0.5f, -0.5f, -0.5f}), toWorld({0.5f, 0.5f, -0.5f}), toWorld({0.5f, -0.5f, 0.5f}));
+            // 5. The sloped side
+            outPlanes[4] = makePlane(toWorld({-0.5f, 0.5f, -0.5f}), toWorld({-0.5f, -0.5f, 0.5f}), toWorld({0.5f, 0.5f, -0.5f}));
+        }
+
         // Generates a 3D hitbox wrapped around the unrotated cube
         AABB getHitbox() const
         {
@@ -380,8 +427,7 @@ namespace vuron
             return tmin;
         }
 
-        // Advanced OBB (Oriented Bounding Box)
-        // Converts the ray into the object's local 1x1x1 space to match the Green visual geometry (using ctrl + b)
+        // The universal plane clipper: Hits any convex hull from any angle
         float intersectsOBB(const Transform& t) const
         {
             // 1. Inverse Translate
@@ -413,45 +459,37 @@ namespace vuron
             o.x /= t.scale.x; o.y /= t.scale.y; o.z /= t.scale.z;
             d.x /= t.scale.x; d.y /= t.scale.y; d.z /= t.scale.z;
 
-            // 4. The Local Slab Method (Against a perfect 1x1x1 cube)
-            float dirX = d.x == 0.0f ? 0.00001f : d.x;
-            float dirY = d.y == 0.0f ? 0.00001f : d.y;
-            float dirZ = d.z == 0.0f ? 0.00001f : d.z;
+            // Initialize the bounds of the ray before clipping
+            float tmin = 0.0f;
+            float tmax = 99999.0f;
 
-            float tmin = (-0.5f - o.x) / dirX;
-            float tmax = (0.5f - o.x) / dirX;
-            if (tmin > tmax) { float temp = tmin; tmin = tmax; tmax = temp; }
-
-            float tymin = (-0.5f - o.y) / dirY;
-            float tymax = (0.5f - o.y) / dirY;
-            if (tymin > tymax) { float temp = tymin; tymin = tymax; tymax = temp; }
-
-            if ((tmin > tymax) || (tymin > tmax)) return -1.0f;
-            if (tymin > tmin) tmin = tymin;
-            if (tymax < tmax) tmax = tymax;
-
-            float tzmin = (-0.5f - o.z) / dirZ;
-            float tzmax = (0.5f - o.z) / dirZ;
-            if (tzmin > tzmax) { float temp = tzmin; tzmin = tzmax; tzmax = temp; }
-
-            if ((tmin > tzmax) || (tzmin > tmax)) return -1.0f;
-            if (tzmin > tmin) tmin = tzmin;
-            if (tzmax < tmax) tmax = tzmax;
-
-            if (tmin < 0.0f) return -1.0f;
-
-            // 5. Advanced Wedge trimming (get it?)
-            if (t.type == ShapeType::WEDGE)
+            // 4. Tests the ray against a mathematical plane
+            auto clip = [&](float num, float denom) -> bool
             {
-                // Calculate exact local hit coordinate
-                Vector3 hitLocal = {o.x + d.x * tmin, o.y + d.y * tmin, o.z + d.z * tmin};
-                // Sloped roof equation in local space: y = -z
-                if (hitLocal.y > -hitLocal.z + 0.01f)
-                {
-                    return -1.0f; // Shot passed through the empty air
-                }
-            }
+                if (denom == 0.0f) return num >= 0.0f;
+                float time = num / denom;
+                if (denom > 0.0f) { if (time < tmax) tmax = time; }
+                else { if (time > tmin) tmin = time; }
+                return tmin <= tmax;
+            };
 
+            // Standard Boundaries shared by both shapes
+            if (!clip(0.5f - o.x, d.x)) return -1.0f; // Right
+            if (!clip(0.5f + o.x, -d.x)) return -1.0f; // Left
+            if (!clip(0.5f + o.y, -d.y)) return -1.0f; // Bottom
+            if (!clip(0.5f + o.z, -d.z)) return -1.0f; // Front
+
+            if (t.type == ShapeType::CUBE)
+            {
+                if (!clip(0.5f - o.y, d.y)) return -1.0f; // Top
+                if (!clip(0.5f - o.z, d.z)) return -1.0f; // Back
+            }
+            else if (t.type == ShapeType::WEDGE)
+            {
+                // Sloped face: y + z <= 0
+                if (!clip(-(o.y + o.z), d.y + d.z)) return -1.0f;
+            }
+            if (tmin < 0.0f) return -1.0f;
             return tmin;
         }
     };

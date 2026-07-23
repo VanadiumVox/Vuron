@@ -874,22 +874,9 @@ namespace vuron {
         xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            if (vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox()))
+            if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox()))
             {
-                if (m_cubes[i].type == vuron::ShapeType::CUBE)
-                {
-                    camera.position.x -= vel.x; vel.x = 0.0f; break;
-                }
-                else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
-                {
-                    float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
-                    float slopeH = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
-                    // If we are below the slope surface, we hit a solid wall
-                    if (camera.position.y - currentHeight < slopeH - 1.5f)
-                    {
-                        camera.position.x -= vel.x; vel.x = 0.0f; break;
-                    }
-                }
+                camera.position.x -= vel.x; vel.x = 0.0f; break;
             }
         }
 
@@ -900,22 +887,9 @@ namespace vuron {
         zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            if (vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox()))
+            if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox()))
             {
-                if (m_cubes[i].type == vuron::ShapeType::CUBE)
-                {
-                    camera.position.z -= vel.z; vel.z = 0.0f; break;
-                }
-                else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
-                {
-                    float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
-                    float slopeH = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
-                    // If we are below the slope surface, we hit a solid wall
-                    if (camera.position.y - currentHeight < slopeH - 0.1f)
-                    {
-                        camera.position.z -= vel.z; vel.z = 0.0f; break;
-                    }
-                }
+                camera.position.z -= vel.z; vel.z = 0.0f; break;
             }
         }
 
@@ -946,62 +920,73 @@ namespace vuron {
             }
         }
 
-        // -- Wedge Pass --
+        // -- Convex Hull Wedge Pass --
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
             if (m_cubes[i].type == vuron::ShapeType::WEDGE)
             {
-                // Broad phase: is player anywhere near the bounding box?
-                if (vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
+                vuron::AABB pBox = camera.getHitbox();
+
+                // Broad phase: Are we inside the AABB? (red box)
+                if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
                 {
-                    float cx = m_cubes[i].position.x;
-                    float cy = m_cubes[i].position.y;
-                    float cz = m_cubes[i].position.z;
-                    float nx = m_cubes[i].normal.x;
-                    float ny = m_cubes[i].normal.y;
-                    float nz = m_cubes[i].normal.z;
+                    vuron::Transform::Plane planes[5];
+                    m_cubes[i].getWedgePlanes(planes);
 
-                    if (ny == 0.0f) ny = 0.0001f; // Prevent div by 0
+                    // Map the player's 3D hitbox
+                    vuron::Vector3 center = { (pBox.min.x + pBox.max.x)*0.5f, (pBox.min.y + pBox.max.y)*0.5f, (pBox.min.z + pBox.max.z)*0.5f };
+                    vuron::Vector3 ext = { (pBox.max.x - pBox.min.x)*0.5f, (pBox.max.y - pBox.min.y)*0.5f, (pBox.max.z - pBox.min.z)*0.5f };
 
-                    float playerFeetY = camera.position.y - currentHeight;
+                    float minPenetration = 9999.0f;
+                    vuron::Vector3 pushNormal = {0, 0, 0};
+                    bool colliding = true;
 
-                    // Narrow phase: the plane equation
-                    // Calculate exact y height of the slope at player's coordinates
-                    float slopeHeight = cy - ((nx * (camera.position.x - cx) + nz * (camera.position.z - cz)) / ny);
-
-                    // If our feet clip the slanted face of the wedge but we aren't deeply beneath it
-                    if (playerFeetY < slopeHeight && playerFeetY > slopeHeight - 1.5f)
+                    // Narrow phase - SAT check against all 5 planes
+                    for (int p = 0; p < 5; p++)
                     {
-                        // 1. Push the player up so they rest on the surface
-                        camera.position.y = slopeHeight + currentHeight + 0.001f;
+                        // Project the player's radius onto the plane's angle
+                        float r = ext.x * std::abs(planes[p].normal.x) +
+                                  ext.y * std::abs(planes[p].normal.y) +
+                                  ext.z * std::abs(planes[p].normal.z);
 
-                        // 2. The vector clip
-                        float impact = vuron::dot(vel, m_cubes[i].normal);
+                        // Distance from player center to plane
+                        float d = vuron::dot(center, planes[p].normal) - planes[p].distance;
 
-                        if (impact < 0.0f) // Moving into the slope
+                        // If outside any of the 5 planes, no collisions
+                        if (d > r) { colliding = false; break; }
+
+                        // Find the plane the player penetrated the least (path of least resistance)
+                        float pen = r - d;
+                        if (pen < minPenetration)
                         {
-                            // Calculate the push-back vectors
-                            float pushX = -(m_cubes[i].normal.x * impact);
-                            float pushY = -(m_cubes[i].normal.y * impact);
-                            float pushZ = -(m_cubes[i].normal.z * impact);
+                            minPenetration = pen;
+                            pushNormal = planes[p].normal;
+                        }
+                    }
 
-                            vel.x += pushX;
-                            vel.y += pushY;
-                            vel.z += pushZ;
+                    if (colliding)
+                    {
+                        // 1. Physically push the player out of the wedge
+                        camera.position.x += pushNormal.x * minPenetration;
+                        camera.position.y += pushNormal.y * minPenetration;
+                        camera.position.z += pushNormal.z * minPenetration;
 
-                            // Physically slide the player
-                            camera.position.x += pushX;
-                            camera.position.z += pushZ;
+                        // 2. Kill velocity moving into the wall
+                        float impact = vuron::dot(vel, pushNormal);
+                        if (impact < 0.0f)
+                        {
+                            vel.x -= pushNormal.x * impact;
+                            vel.y -= pushNormal.y * impact;
+                            vel.z -= pushNormal.z * impact;
                         }
 
-                        // Ground the player if the slope is flat enough
-                        if (ny > 0.7f)
+                        // 3. if the plane we hit was flat enough to stand on
+                        if (pushNormal.y > 0.7f)
                         {
                             camera.isGrounded = true;
                             camera.crouchedMidAir = false;
-
-                            // FIX: Restore air charges when landing on a ramp
                             camera.currentAirGrapples = camera.maxAirGrapples;
+                            vel.x *= 0.5f; vel.z *=0.5f; // Friction
                         }
                     }
                 }
