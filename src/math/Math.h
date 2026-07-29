@@ -452,8 +452,8 @@ namespace vuron
             };
 
             // 2. Inverse Rotate (reverse order: Z, Y, X with negative angles)
-            o = rotZ(o, t.rotation.z); o = rotY(o, -t.rotation.y); o = rotX(o, -t.rotation.x);
-            d = rotZ(d, t.rotation.z); d = rotY(d, -t.rotation.y); d = rotX(d, -t.rotation.x);
+            o = rotZ(o, t.rotation.z); o = rotY(o, t.rotation.y); o = rotX(o, -t.rotation.x);
+            d = rotZ(d, t.rotation.z); d = rotY(d, t.rotation.y); d = rotX(d, -t.rotation.x);
 
             // 3. Inverse Scale
             o.x /= t.scale.x; o.y /= t.scale.y; o.z /= t.scale.z;

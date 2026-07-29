@@ -14,12 +14,14 @@ struct VertexOut {
     float4 position [[position]];
     float3 color;
     float3 localPos;
+    float3 worldPos;
 };
 
 // The math program (runs on GPU cores)
 vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
             constant VertexIn* vertices [[buffer(0)]],
-            constant float4x4& mvpMatrix [[buffer(1)]]) //The new bridge
+            constant float4x4& mvpMatrix [[buffer(1)]], // The mvp matrix bridge
+            constant float4x4& modelMatrix [[buffer(3)]]) // The model matrix bridge
 {
     VertexOut out;
     VertexIn in = vertices[VertexID];
@@ -30,6 +32,9 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
 
     out.color = in.color;
     out.localPos = float3(in.position[0], in.position[1], in.position[2]);
+
+    // Calculating 3D position for Lighting math
+    out.worldPos = (modelMatrix * float4(in.position, 1.0)).xyz;
 
     return out;
 }
@@ -71,6 +76,50 @@ fragment float4 fragmentMain(VertexOut in [[stage_in]],
         return float4(0.0, 0.0, 0.0, alphaFlag);
     }
 
-    // --- Standard Geometry ---
-    return float4(in.color, 1.0);
+    // --- The Lighting Pass ---
+
+    // 1. The trick: Calculate Flat-shaded normal
+    // Metal compares this exact pixel's3D position with the pixel next to it
+    float3 dx = dfdx(in.worldPos);
+    float3 dy = dfdy(in.worldPos);
+
+    // Cross product gives us the perfect perpendicular vector
+    // (if lighting looks inside-out, swap this to cross(dx, dy)
+    float3 normal = normalize(cross(dx, dy));
+
+    // 2. The Sun (directional light)
+    // Pointing down and slightly forward
+    float3 sunDir = normalize(float3(-0.5, -1.0, 0.5));
+    float3 lightDir = -sunDir; // Reverse to point TOWARD the sun for the math
+
+    // Ambient light
+    float ambient = 0.35;
+
+    // The Valve "Half-Lambertian" light trick
+    // Wraps light around geometry so faces pointing away from the sun get soft bounced light
+    float diffuse = (dot(normal, lightDir) * 0.5) + 0.5;
+
+    // 3. Dynamic point light (the glowing pick-up item / rocket / whatnot)
+    // Hardcoded near the staircase for testing! =======================================================]
+    float3 pointLightPos = float3(0.0, -1.0, 4.0);
+    float3 pointLightColor = float3(1.0, 0.4, 0.0); // Bright ORANGE
+    float lightRadius = 6.0;
+
+    // Calculate total distance and angle to the point light
+    float3 dirToLight = pointLightPos - in.worldPos;
+    float distToLight = length(dirToLight);
+    dirToLight = normalize(dirToLight);
+
+    // Fade out over a distance (attenuation)
+    float attenuation = max(0.0, 1.0 - (distToLight / lightRadius));
+    float pointDiffuse = max(0.0, dot(normal, dirToLight)) * attenuation;
+
+    // 4. Combine all light sources
+    // Ambient + Sunlight + (Point light * point light color)
+    float3 finalLight = ambient + (diffuse * 0.6) + (pointDiffuse * pointLightColor * 1.5);
+
+    // Multiply the raw color by the lighting data
+    float3 finalColor = in.color * finalLight;
+
+    return float4(finalColor, 1.0);
 }

@@ -1165,6 +1165,9 @@ namespace vuron {
             // Inject the matrix directly into GPU Register slot 1
             [encoder setVertexBytes:&mvpMatrix length:sizeof(vuron::Matrix4x4) atIndex:1];
 
+            // Inject the pure Model Matrix into the GPU register slot 3 for lighting calculations
+            [encoder setVertexBytes:&modelMatrix length:sizeof(vuron::Matrix4x4) atIndex:3];
+
             if (m_cubes[i].type == vuron::ShapeType::CUBE)
             {
                 // Execute the draw using the map, connecting the dots
