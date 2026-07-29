@@ -894,36 +894,42 @@ namespace vuron {
         }
 
         // -- Y-Axis Pass (Gravity & Floors) --
-        camera.position.y += vel.y;
-        vuron::AABB yBox = camera.getHitbox();
 
-        // Anti-phasing: Stretch hitbox to prevent clipping
-        if (vel.y < 0.0f) yBox.max.y -= vel.y;
-        else if (vel.y > 0.0f) yBox.min.y -= vel.y;
+        // Time Slicing: Breaks massive speeds into safer, 0.25 unit chunks
+        int ySteps = std::max(1, (int)std::ceil(std::abs(vel.y) / 0.25f));
+        float stepY = vel.y / ySteps;
 
-        for (size_t i = 0; i < m_cubes.size(); ++i)
+        for (int s = 0; s < ySteps; ++s)
         {
-            if (m_cubes[i].type != vuron::ShapeType::WEDGE && vuron::AABB::checkCollision(yBox, m_cubes[i].getHitbox()))
-            {
-                if (vel.y < 0.0f) // Floor
-                {
-                    camera.position.y = m_cubes[i].getHitbox().max.y + currentHeight + 0.001f;
-                    camera.isGrounded = true;
-                    camera.currentAirGrapples = camera.maxAirGrapples;
-                    camera.crouchedMidAir = false;
+            camera.position.y += stepY;
 
-                    // Geometry Cleanup
-                    // Friction: Stops infinite sliding, but doesn't force-detach the grapple
-                    camera.velocity.x *= 0.5f;
-                    camera.velocity.z *= 0.5f;
-                }
-                else if (vel.y > 0.0f) // Ceiling
+            for (size_t i = 0; i < m_cubes.size(); ++i)
+            {
+                if (m_cubes[i].type != vuron::ShapeType::WEDGE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
                 {
-                    camera.position.y = m_cubes[i].getHitbox().min.y - 0.201f;
+                    if (vel.y < 0.0f) // Floor
+                    {
+                        camera.position.y = m_cubes[i].getHitbox().max.y + currentHeight + 0.001f;
+                        camera.isGrounded = true;
+                        camera.currentAirGrapples = camera.maxAirGrapples;
+                        camera.crouchedMidAir = false;
+
+                        // Geometry Cleanup
+                        // Friction: Stops infinite sliding, but doesn't force-detach the grapple
+                        camera.velocity.x *= 0.5f;
+                        camera.velocity.z *= 0.5f;
+                    }
+                    else if (vel.y > 0.0f) // Ceiling
+                    {
+                        camera.position.y = m_cubes[i].getHitbox().min.y - 0.201f;
+                    }
+                    vel.y = 0.0f;
+                    stepY = 0.0f; // Halt the time-slice loop
+                    break;
                 }
-                vel.y = 0.0f;
-                break;
             }
+            // If we hit a floor or ceiling, exit the time-slice loop
+            if (vel.y == 0.0f) break;
         }
 
         // -- Convex Hull Wedge Pass --
@@ -934,8 +940,8 @@ namespace vuron {
                 vuron::AABB pBox = camera.getHitbox();
 
                 // Anti-phasing: Stretch hitbox to prevent clipping
-                if (vel.y < 0.0f) yBox.max.y -= vel.y;
-                else if (vel.y > 0.0f) yBox.min.y -= vel.y;
+                if (vel.y < 0.0f) pBox.max.y -= vel.y;
+                else if (vel.y > 0.0f) pBox.min.y -= vel.y;
 
                 // Broad phase: Are we inside the AABB? (red box)
                 if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
