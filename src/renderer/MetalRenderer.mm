@@ -895,9 +895,15 @@ namespace vuron {
 
         // -- Y-Axis Pass (Gravity & Floors) --
         camera.position.y += vel.y;
+        vuron::AABB yBox = camera.getHitbox();
+
+        // Anti-phasing: Stretch hitbox to prevent clipping
+        if (vel.y < 0.0f) yBox.max.y -= vel.y;
+        else if (vel.y > 0.0f) yBox.min.y -= vel.y;
+
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            if (m_cubes[i].type != vuron::ShapeType::WEDGE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
+            if (m_cubes[i].type != vuron::ShapeType::WEDGE && vuron::AABB::checkCollision(yBox, m_cubes[i].getHitbox()))
             {
                 if (vel.y < 0.0f) // Floor
                 {
@@ -926,6 +932,10 @@ namespace vuron {
             if (m_cubes[i].type == vuron::ShapeType::WEDGE)
             {
                 vuron::AABB pBox = camera.getHitbox();
+
+                // Anti-phasing: Stretch hitbox to prevent clipping
+                if (vel.y < 0.0f) yBox.max.y -= vel.y;
+                else if (vel.y > 0.0f) yBox.min.y -= vel.y;
 
                 // Broad phase: Are we inside the AABB? (red box)
                 if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
@@ -1193,6 +1203,10 @@ namespace vuron {
         // ===========================================
         if (m_showBoundingBoxes)
         {
+            // Tell the shader to bypass lighting for wireframes
+            float wireframeFlag = 1.2f;
+            [encoder setFragmentBytes:&wireframeFlag length:sizeof(float) atIndex:2];
+
             for (size_t i = 0; i < m_cubes.size(); ++i)
             {
                 // Ignore culled objects

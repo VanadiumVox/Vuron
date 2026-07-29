@@ -76,6 +76,13 @@ fragment float4 fragmentMain(VertexOut in [[stage_in]],
         return float4(0.0, 0.0, 0.0, alphaFlag);
     }
 
+    // -- The Wireframe Pass ---
+    else if (alphaFlag > 1.1 && alphaFlag < 1.4)
+    {
+        // Immediately return the pure, un-shaded color of the line
+        return float4(in.color, 1.0);
+    }
+
     // --- The Lighting Pass ---
 
     // 1. The trick: Calculate Flat-shaded normal
