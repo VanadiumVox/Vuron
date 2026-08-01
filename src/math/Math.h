@@ -502,6 +502,7 @@ namespace vuron
         // Player's neck and spine angles
         float pitch = 0.0f; // Looking up and down
         float yaw = 0.0f; // Looking left and right
+        float roll = 0.0f; // Tracks Z-axis tilt
 
         // Tracks the player's 3D Momentum
         Vector3 velocity = {0.0f, 0.0f, 0.0f};
@@ -554,9 +555,11 @@ namespace vuron
             // 2. Rotate the universe
             Matrix4x4 ry = Matrix4x4::rotationY(yaw);
             Matrix4x4 rx = Matrix4x4::rotationX(pitch);
+            Matrix4x4 rz = Matrix4x4::rotationZ(roll);
 
             // Multiply by translating the world first, then spinning it
-            return t * ry * rx;
+            // Applying rolls last to ensure tilt happens relative to the screen
+            return t * ry * rx * rz;
         }
     };
 }

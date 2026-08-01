@@ -67,6 +67,9 @@ namespace vuron
         bool m_isAccelerating = false; // Tracks the toggle state
         float m_currentMomentum = 0.01f; // The player's momentum
 
+        // Tracks the current zoom for smooth FOV transitions
+        float m_currentZoom = 1500.0f;
+
         // SOCD (Last-Win) axis trackers
         char m_activeX = 0;
         char m_activeZ = 0;

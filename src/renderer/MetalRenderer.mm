@@ -1086,14 +1086,54 @@ namespace vuron {
         }
         // ================================================
 
-
-        // Grab the inverse matrix to physically shift the universe around the player
-        vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();
-
         float screenW = (float)drawable.texture.width;
         float screenH = (float)drawable.texture.height > 0 ? (float)drawable.texture.height : 1.0f;
-        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(screenW, screenH, 1500.0f, 0.1f, 200.0f);
 
+        // a. -= Camera Tilt =- -----------------------------------
+        float targetRoll = 0.0f;
+
+        // Scale the tilt intensity by momentum.
+        // 0.15f is the max multiplier. at 0.5f, the toll is 0.075f
+        // at 1.0, roll is 0.15f
+        float rollIntensity = m_currentMomentum * 0.15f;
+
+        // SOCD roll: Lean into the strafe
+        if (m_activeX == 'a')
+        {
+            targetRoll = -rollIntensity; // Lean left
+        }
+        else if (m_activeX == 'd')
+        {
+            targetRoll = rollIntensity; // Lean right
+        }
+
+        // Smoothly interpolate the camera's actual roll towards the target
+        camera.roll += (targetRoll - camera.roll) * 0.15f;
+
+        // b. Dynamic speed FOV (Zoom)
+        float baseZoom = 1500.0f;
+
+        // Widen the FOV based on momentum.
+        float targetZoom = baseZoom - (m_currentMomentum * 1000.0f);
+
+        // Hard capping the FOV so it doesn't invert
+        if (targetZoom < 400.0f)
+        {
+            targetZoom = 400.0f;
+        }
+
+        // Smoothly interpolate the active zoom
+        m_currentZoom += (targetZoom - m_currentZoom) * 0.25f;
+
+        // c. Apply to matrices
+        // viewmatrix now automatically applies the z-roll added in math.h
+        vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();
+
+        // projectionMatrix now uses the interpolated m_currentZoom
+        vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(
+            screenW, screenH, m_currentZoom, 0.1f, 200.0f
+        );
+        // --------------------------------------------------------
 
         // 3. Prepping the GPU Pipeline
         [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_pipelineState];
