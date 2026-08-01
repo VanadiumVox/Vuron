@@ -16,15 +16,43 @@ namespace vuron {
     // -=The input Bridge=-
     // Changes flags the exact millisecond a key is pressed
     // Bypasses standard keyboard delay
-    void MetalRenderer::setKeyState(char key, bool isPressed) {
+    void MetalRenderer::setKeyState(char key, bool isPressed)
+    {
+        // -= Double-tap acceleration logic =-
+        if (key == 'w' || key == 'a' || key == 's' || key == 'd')
+        {
+            // Check if the key is already held down to filter out macOS key-repeat spam
+            bool alreadyPressed = false;
+            if (key == 'w') alreadyPressed = m_keyW;
+            if (key == 'a') alreadyPressed = m_keyA;
+            if (key == 's') alreadyPressed = m_keyS;
+            if (key == 'd') alreadyPressed = m_keyD;
+
+            if (isPressed && !alreadyPressed)
+            {
+                // if it's the same key and the timer is alive, accelerate
+                if (m_lastTappedKey == key && m_doubleTapWindow > 0)
+                {
+                    m_isAccelerating = true;
+                }
+                // Record this physical tap and reset the timer (15 frames = 0.25s roughly)
+                m_lastTappedKey = key;
+                m_doubleTapWindow = 15;
+            }
+        }
+
         // Z-axis (forward/backwards)
-        if (key == 'w' || key == 's') {
+        if (key == 'w' || key == 's')
+        {
             if (key == 'w') m_keyW = isPressed;
             if (key == 's') m_keyS = isPressed;
 
-            if (isPressed) {
+            if (isPressed)
+            {
                 m_activeZ = key; // The most recent key
-            } else {
+            }
+            else
+            {
                 // If we let go of a key, check if opposite key is still held
                 if (key == 'w' && m_keyS) m_activeZ = 's'; // First w then s
                 else if (key == 's' && m_keyW) m_activeZ = 'w'; // First s then w
@@ -33,13 +61,17 @@ namespace vuron {
         }
 
         //X-axis (left/right)
-        if (key == 'a' || key == 'd') {
+        if (key == 'a' || key == 'd')
+        {
             if (key == 'a') m_keyA = isPressed;
             if (key == 'd') m_keyD = isPressed;
 
-            if (isPressed) {
+            if (isPressed)
+            {
                 m_activeX = key; // The most recent key
-            } else {
+            }
+            else
+            {
                 if (key == 'a' && m_keyD) m_activeX = 'd';
                 else if (key == 'd' && m_keyA) m_activeX = 'a';
                 else m_activeX = 0;
@@ -47,22 +79,27 @@ namespace vuron {
         }
 
         // Jump logic
-        if (key == ' ') {
+        if (key == ' ')
+        {
             m_keySpace = isPressed;
             // The exact moment you let go
-            if (!isPressed) {
+            if (!isPressed)
+            {
                 m_hasJumped = false;
             }
         }
 
         // Crouch logic
-        if (key == 'C') {
+        if (key == 'C')
+        {
             m_keyShift = isPressed;
         }
 
         // Acceleration toggle logic
-        if (key == 'r') {
-            if (isPressed && !m_keyR) {
+        if (key == 'r')
+        {
+            if (isPressed && !m_keyR)
+            {
                 m_isAccelerating = !m_isAccelerating; // Flip the switch
             }
             m_keyR = isPressed;
@@ -505,6 +542,9 @@ namespace vuron {
         // --= Tick Combo Timers =--
         if (m_wavedashWindow > 0) m_wavedashWindow--;
         if (m_jumpBuffer > 0) m_jumpBuffer--;
+
+        // Decay the double-tap sprint window
+        if (m_doubleTapWindow > 0) m_doubleTapWindow--;
 
 
         // Tick the long jump hang time (approx 30 frames = 0.5s)
