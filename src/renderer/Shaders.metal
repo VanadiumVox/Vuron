@@ -44,7 +44,8 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
 // and put it directly in this function
 // P.S, I'm leaving that as 'otuput' to prove that this was written by a human.
 fragment float4 fragmentMain(VertexOut in [[stage_in]],
-                             constant float& alphaFlag [[buffer(2)]])
+                             constant float& alphaFlag [[buffer(2)]],
+                             constant float4& grappleLight [[buffer(3)]])
 {
 
     // --- The Crosshair Pass ---
@@ -106,24 +107,41 @@ fragment float4 fragmentMain(VertexOut in [[stage_in]],
     // Wraps light around geometry so faces pointing away from the sun get soft bounced light
     float diffuse = (dot(normal, lightDir) * 0.5) + 0.5;
 
-    // 3. Dynamic point light (the glowing pick-up item / rocket / whatnot)
-    // Hardcoded near the staircase for testing! =======================================================]
+    // 3. Dynamic point light (Hardcoded orange one)
     float3 pointLightPos = float3(0.0, -1.0, 4.0);
     float3 pointLightColor = float3(1.0, 0.4, 0.0); // Bright ORANGE
     float lightRadius = 6.0;
 
-    // Calculate total distance and angle to the point light
     float3 dirToLight = pointLightPos - in.worldPos;
     float distToLight = length(dirToLight);
     dirToLight = normalize(dirToLight);
 
-    // Fade out over a distance (attenuation)
     float attenuation = max(0.0, 1.0 - (distToLight / lightRadius));
     float pointDiffuse = max(0.0, dot(normal, dirToLight)) * attenuation;
 
-    // 4. Combine all light sources
-    // Ambient + Sunlight + (Point light * point light color)
-    float3 finalLight = ambient + (diffuse * 0.6) + (pointDiffuse * pointLightColor * 1.5);
+    // =================================================
+    // 4. THE DYNAMIC GRAPPLE AURA (Blue)
+    // =================================================
+    float3 grappleColor = float3(0.0, 0.6, 1.0); // Crisp Cyan/Blue
+    float grappleRadius = grappleLight.w; // w is the 4th value in our array (Radius)
+    float grappleDiffuse = 0.0;
+
+    // Only burn GPU cycles doing the math if the grapple is actually attached
+    if (grappleRadius > 0.0)
+    {
+        float3 dirToGrapple = grappleLight.xyz - in.worldPos;
+        float distToGrapple = length(dirToGrapple);
+        dirToGrapple = normalize(dirToGrapple);
+
+        float grappleAtten = max(0.0, 1.0 - (distToGrapple / grappleRadius));
+
+        // Push the light slightly harder so it washes over the wall
+        grappleDiffuse = max(0.0, dot(normal, dirToGrapple)) * grappleAtten;
+    }
+
+    // 5. Combine all light sources
+    // Ambient + Sunlight + Orange Point Light + Blue Grapple Light (Boosted intensity by 2.5)
+    float3 finalLight = ambient + (diffuse * 0.6) + (pointDiffuse * pointLightColor * 1.5) + (grappleDiffuse * grappleColor * 2.5);
 
     // Multiply the raw color by the lighting data
     float3 finalColor = in.color * finalLight;

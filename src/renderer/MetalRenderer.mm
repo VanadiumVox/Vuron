@@ -1102,7 +1102,7 @@ namespace vuron {
             {
                 // The player released and presses space again in midair
                 float peakWindow = 0.08f; // How forgiving the apex timing is
-                float rocketForce = 0.45f; // 3x the standard jump height
+                float rocketForce = 0.75f; // 5x jump height
 
                 // Condition 1: Are they holding Crouch?
                 // Condition 2: Did they Initiate that crouch midair?
@@ -1183,6 +1183,39 @@ namespace vuron {
         // Ensure normal geometry draws completely solid
         float solidAlpha = 1.0f;
         [encoder setFragmentBytes:&solidAlpha length:sizeof(float) atIndex:2];
+
+        // =====================================================
+        // --- Dynamic Grapple Light Bridge ---
+        // =====================================================
+        // Array format: {x, y, z, radius}
+        float grappleLightData[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+        if (camera.isGrappling)
+        {
+            // 1. Calculate direction from the wall to the player
+            float dirX = camera.position.x - camera.grapplePoint.x;
+            float dirY = camera.position.y - camera.grapplePoint.y;
+            float dirZ = camera.position.z - camera.grapplePoint.z;
+
+            float dist = std::sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ);
+
+            // Normalizing the vector
+            if (dist > 0.0f)
+            {
+                dirX /= dist;
+                dirY /= dist;
+                dirZ /= dist;
+            }
+
+            grappleLightData[0] = camera.grapplePoint.x + (dirX * 0.2f);
+            grappleLightData[1] = camera.grapplePoint.y + (dirY * 0.2f);
+            grappleLightData[2] = camera.grapplePoint.z + (dirZ * 0.2f);
+            grappleLightData[3] = 12.0f; // The radius of the grapple aura
+        }
+
+        // Injecting this into the GPU's fragment shader at buffer index 3
+        [encoder setFragmentBytes:&grappleLightData length:sizeof(float) * 4 atIndex:3];
+
 
         // =============================================================
         // --- Shadow Drop Cast Algorithm ---
