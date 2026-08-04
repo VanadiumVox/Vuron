@@ -5,6 +5,7 @@
 #import <AppKit/NSView.h>
 #import <AppKit/AppKit.h>
 #include <iostream>
+#include <mach-o/dyld.h>
 #include "../math/Math.h"
 #include "../world/LevelLoader.h"
 
@@ -186,8 +187,28 @@ namespace vuron {
 
       m_metalLayer = (void*)metalLayer;
 
-      // Loading and compiling the Shader File at Runtime
-      NSString* shaderPath = @"src/renderer/Shaders.metal";
+      // 1. Ask the macOS Kernel exactly where this binary lives
+      char pathBuffer[1024];
+      uint32_t size = sizeof(pathBuffer);
+      _NSGetExecutablePath(pathBuffer, &size);
+
+      NSString* rawPath = [NSString stringWithUTF8String:pathBuffer];
+      NSString* execPath = [rawPath stringByStandardizingPath];
+      NSString* baseDir = [execPath stringByDeletingLastPathComponent];
+
+      // 2. Demo Mode Check (Looks right next to the executable)
+      NSString* shaderPath = [baseDir stringByAppendingPathComponent:@"src/renderer/Shaders.metal"];
+
+      // 3. Dev Mode Fallback (If not found, step up one directory out of 'build' or 'bin')
+      if (![[NSFileManager defaultManager] fileExistsAtPath:shaderPath])
+      {
+          shaderPath = [baseDir stringByAppendingPathComponent:@"../src/renderer/Shaders.metal"];
+          // Clean up the string so it looks nice in the terminal
+          shaderPath = [shaderPath stringByStandardizingPath];
+      }
+
+      std::cout << "[Vuron] Hunting for shaders at: " << [shaderPath UTF8String] << std::endl;
+
       NSError* error = nil;
       NSString* shaderSource = [NSString stringWithContentsOfFile:shaderPath encoding:NSUTF8StringEncoding error:&error];
 
@@ -559,9 +580,28 @@ namespace vuron {
         // --------------------------
 
         // Initialize the level (Only runs on the very first frame)
-        if (!m_levelLoaded) {
-            // Loading from the text file
-            m_cubes = vuron::LevelLoader::loadLevel("src/levels/test_arena.vlvl");
+        if (!m_levelLoaded)
+        {
+            char pathBuffer[1024];
+            uint32_t size = sizeof(pathBuffer);
+            _NSGetExecutablePath(pathBuffer, &size);
+
+            NSString* rawPath = [NSString stringWithUTF8String:pathBuffer];
+            NSString* execPath = [rawPath stringByStandardizingPath];
+            NSString* baseDir = [execPath stringByDeletingLastPathComponent];
+
+            NSString* levelPathNS = [baseDir stringByAppendingPathComponent:@"src/levels/test_arena.vlvl"];
+
+            // The Dev Mode Fallback
+            if (![[NSFileManager defaultManager] fileExistsAtPath:levelPathNS]) {
+                levelPathNS = [baseDir stringByAppendingPathComponent:@"../src/levels/test_arena.vlvl"];
+                levelPathNS = [levelPathNS stringByStandardizingPath];
+            }
+
+            std::string levelPath = [levelPathNS UTF8String];
+            std::cout << "[Vuron] Loading Level from: " << levelPath << std::endl;
+
+            m_cubes = vuron::LevelLoader::loadLevel(levelPath.c_str());
             m_levelLoaded = true;
         }
 
