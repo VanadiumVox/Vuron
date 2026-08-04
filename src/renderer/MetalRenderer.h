@@ -7,6 +7,7 @@
 
 #include <vector>
 #include "../math/Math.h"
+#include "../world/SpatialGrid.h"
 
 namespace vuron
 {
@@ -109,6 +110,9 @@ namespace vuron
 
         // Hitbox debugging
         bool m_showBoundingBoxes = false;
+
+        // The Spatial grid - Manages physics state
+        vuron::SpatialHashGrid m_grid;
 
     };
 }

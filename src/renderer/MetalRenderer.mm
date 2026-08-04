@@ -611,6 +611,12 @@ namespace vuron {
         m_cubes[1].rotation = {0.0f, angle, angle * 0.5f};
         m_cubes[2].rotation = {angle * 2.0f, angle * 2.0f, 0.0f};
 
+        // --- REBUILD HASH GRID ---
+        m_grid.clear();
+        for (size_t i = 0; i < m_cubes.size(); ++i) {
+            m_grid.insert((int)i, m_cubes[i].getHitbox());
+        }
+
         // ===============================================
         // -= Unified Physics and Movement Engine =-
         // ===============================================
@@ -952,10 +958,10 @@ namespace vuron {
         vuron::AABB xBox = camera.getHitbox();
         // Lift the feet slightly so we glide over floor polygons instead of snagging
         xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
-        for (size_t i = 0; i < m_cubes.size(); ++i)
+        const std::vector<int>& xCandidates = m_grid.query(xBox);
+        for (int i : xCandidates)
         {
-            if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox()))
-            {
+            if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox())) {
                 camera.position.x -= vel.x; vel.x = 0.0f; break;
             }
         }
@@ -965,10 +971,10 @@ namespace vuron {
         vuron::AABB zBox = camera.getHitbox();
         // Lift feet to glide over floors, yadda yaddda
         zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
-        for (size_t i = 0; i < m_cubes.size(); ++i)
+        const std::vector<int>& zCandidates = m_grid.query(zBox);
+        for (int i : zCandidates)
         {
-            if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox()))
-            {
+            if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox())) {
                 camera.position.z -= vel.z; vel.z = 0.0f; break;
             }
         }
@@ -982,8 +988,9 @@ namespace vuron {
         for (int s = 0; s < ySteps; ++s)
         {
             camera.position.y += stepY;
+            const std::vector<int>& yCandidates = m_grid.query(camera.getHitbox());
 
-            for (size_t i = 0; i < m_cubes.size(); ++i)
+            for (int i : yCandidates)
             {
                 if (m_cubes[i].type != vuron::ShapeType::WEDGE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
                 {
@@ -1013,15 +1020,21 @@ namespace vuron {
         }
 
         // -- Convex Hull Wedge Pass --
-        for (size_t i = 0; i < m_cubes.size(); ++i)
+        // 1. Getting the base hitbox
+        vuron::AABB pBox = camera.getHitbox();
+
+        // 2. Anti-phasing: Stretch hitbox to prevent clipping
+        if (vel.y < 0.0f) pBox.max.y -= vel.y;
+        else if (vel.y > 0.0f) pBox.min.y -= vel.y;
+
+        // 3. Broad phase: Query the grid using the stretched hitbox
+        const std::vector<int>& wedgeCandidates = m_grid.query(pBox);
+
+        // 4. Narrow phase: SAT math
+        for (int i : wedgeCandidates)
         {
             if (m_cubes[i].type == vuron::ShapeType::WEDGE)
             {
-                vuron::AABB pBox = camera.getHitbox();
-
-                // Anti-phasing: Stretch hitbox to prevent clipping
-                if (vel.y < 0.0f) pBox.max.y -= vel.y;
-                else if (vel.y > 0.0f) pBox.min.y -= vel.y;
 
                 // Broad phase: Are we inside the AABB? (red box)
                 if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
