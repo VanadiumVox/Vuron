@@ -8,6 +8,7 @@
 #include <mach-o/dyld.h>
 #include "../math/Math.h"
 #include "../world/LevelLoader.h"
+#include "../world/MapParser.h"
 
 namespace vuron {
     // Constructor & destructor
@@ -590,30 +591,55 @@ namespace vuron {
             NSString* execPath = [rawPath stringByStandardizingPath];
             NSString* baseDir = [execPath stringByDeletingLastPathComponent];
 
-            NSString* levelPathNS = [baseDir stringByAppendingPathComponent:@"src/levels/test_arena.vlvl"];
+            // Loaded Level name
+            NSString* targetFile = @"test_arena.map";
 
-            // The Dev Mode Fallback
-            if (![[NSFileManager defaultManager] fileExistsAtPath:levelPathNS]) {
-                levelPathNS = [baseDir stringByAppendingPathComponent:@"../src/levels/test_arena.vlvl"];
+            // Primary Path (demo mode)
+            NSString* levelPathNS = [[baseDir stringByAppendingPathComponent:@"src/levels/"] stringByAppendingPathComponent:targetFile];
+
+            // Dev mode fallback (step out of build/ dir)
+            if (![[NSFileManager defaultManager] fileExistsAtPath:levelPathNS])
+            {
+                levelPathNS = [[baseDir stringByAppendingPathComponent:@"../src/levels/"] stringByAppendingPathComponent:targetFile];
                 levelPathNS = [levelPathNS stringByStandardizingPath];
             }
 
             std::string levelPath = [levelPathNS UTF8String];
-            std::cout << "[Vuron] Loading Level from: " << levelPath << std::endl;
+            std::cout << "[Vuron] Loading TrenchBroom map from: " << levelPath << std::endl;
 
-            m_cubes = vuron::LevelLoader::loadLevel(levelPath.c_str());
+            // Route to the correct parser based  on file extension
+            if (levelPath.length() >= 4 && levelPath.substr(levelPath.length() - 4) == ".map")
+            {
+                vuron::MapData mapData = vuron::MapParser::loadMap(levelPath);
+                camera.position = mapData.playerSpawn;
+                m_cubes = vuron::MapParser::generateShapes(mapData);
+            }
+            else if (levelPath.length() >= 5 && levelPath.substr(levelPath.length() - 5) == ".vlvl")
+            {
+                // Keeping the original fallback camera spawn for .vlvl files
+                camera.position = {0.0f, 2.0f, -5.0f};
+                m_cubes = vuron::LevelLoader::loadLevel(levelPath);
+            }
+            else
+            {
+                std::cerr << "[Vuron] Fatal: Unknown level file extension." << std::endl;
+            }
+
             m_levelLoaded = true;
         }
 
         // Update Geometry (dash) (2.2 when??)
         // We manually spin the first 3 cubes in our list
-        m_cubes[0].rotation = {angle, angle * 0.7f, 0.0f};
-        m_cubes[1].rotation = {0.0f, angle, angle * 0.5f};
-        m_cubes[2].rotation = {angle * 2.0f, angle * 2.0f, 0.0f};
+//         m_cubes[0].rotation = {angle, angle * 0.7f, 0.0f};
+//         m_cubes[1].rotation = {0.0f, angle, angle * 0.5f};
+//         m_cubes[2].rotation = {angle * 2.0f, angle * 2.0f, 0.0f};
+        // R.I.P Rotating cubes.....
+        // You will be missed. Perished 7th Aug 2026.
 
-        // --- REBUILD HASH GRID ---
+        // Rebuild Spatial Hash Grid safely for whatever objects exist
         m_grid.clear();
-        for (size_t i = 0; i < m_cubes.size(); ++i) {
+        for (size_t i = 0; i < m_cubes.size(); ++i)
+        {
             m_grid.insert((int)i, m_cubes[i].getHitbox());
         }
 
@@ -1224,7 +1250,7 @@ namespace vuron {
 
         // projectionMatrix now uses the interpolated m_currentZoom
         vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(
-            screenW, screenH, m_currentZoom, 0.1f, 200.0f
+            screenW, screenH, m_currentZoom, 0.1f, 1000.0f // Last number is render distance
         );
         // --------------------------------------------------------
 
