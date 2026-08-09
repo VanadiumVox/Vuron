@@ -15,6 +15,11 @@ namespace vuron {
     MetalRenderer::MetalRenderer() : m_device(nullptr), m_commandQueue(nullptr), m_metalLayer(nullptr), m_pipelineState(nullptr), m_vertexBuffer(nullptr), m_indexBuffer(nullptr), m_depthTexture(nullptr), m_depthStencilState(nullptr) {}
     MetalRenderer::~MetalRenderer() { shutdown(); }
 
+    // Memory state for spawn
+    static vuron::Vector3 g_activeRespawnPoint = {0.0f, 2.0f, -5.0f};
+
+    static id<MTLDepthStencilState> g_uiDepthState = nil;
+
     // -=The input Bridge=-
     // Changes flags the exact millisecond a key is pressed
     // Bypasses standard keyboard delay
@@ -261,6 +266,12 @@ namespace vuron {
         NSLog(@"Failed to create UI pipeline state: %@", error);
       }
       m_uiPipelineState = (void*)uiState;
+
+      // -= UI Depth State (Always drawn on top) =-
+      MTLDepthStencilDescriptor* uiDepthDesc = [[MTLDepthStencilDescriptor alloc] init];
+      uiDepthDesc.depthCompareFunction = MTLCompareFunctionAlways; // Ignores walls
+      uiDepthDesc.depthWriteEnabled = NO;
+      g_uiDepthState = [device newDepthStencilStateWithDescriptor:uiDepthDesc];
 
       std::cout << "Vuron Shaders successfuly compiled" << std::endl;
 
@@ -612,7 +623,38 @@ namespace vuron {
             {
                 vuron::MapData mapData = vuron::MapParser::loadMap(levelPath);
                 camera.position = mapData.playerSpawn;
+                g_activeRespawnPoint = mapData.playerSpawn;
                 m_cubes = vuron::MapParser::generateShapes(mapData);
+
+                // -- GPU Bake Pass: Compiling custom Geometry
+                id<MTLDevice> device = (id<MTLDevice>)m_device;
+                for (size_t i = 0; i < m_cubes.size(); ++i)
+                {
+                    if (m_cubes[i].type == vuron::ShapeType::CUSTOM && !m_cubes[i].customTriangles.empty())
+                    {
+                        std::vector<vuron::Vertex> gpuVertices;
+
+                        // Convert the World space points to Local space points by subtracting the center position
+                        for (const auto& pt : m_cubes[i].customTriangles)
+                        {
+                            vuron::Vector3 localPt =
+                            {
+                                pt.x - m_cubes[i].position.x,
+                                pt.y - m_cubes[i].position.y,
+                                pt.z - m_cubes[i].position.z
+                            };
+
+                            // Giving custom shapes a distinct Orange color
+                            gpuVertices.push_back({localPt, {1.0f, 0.5f, 0.2f}});
+                        }
+                        m_cubes[i].customVertexCount = (int)gpuVertices.size();
+
+                        // Allocating a dedicated Metal Buffer just for the weird shapes
+                        m_cubes[i].customVertexBuffer = (void*)[device newBufferWithBytes:gpuVertices.data()
+                                                                    length:(sizeof(vuron::Vertex) * gpuVertices.size())
+                                                                    options:MTLResourceStorageModeShared];
+                    }
+                }
             }
             else if (levelPath.length() >= 5 && levelPath.substr(levelPath.length() - 5) == ".vlvl")
             {
@@ -875,6 +917,15 @@ namespace vuron {
         else if (camera.velocity.y < 0.0f && m_keyShift) currentGravity = fastFallGravity;
         else if (camera.velocity.y < 0.0f && m_keySpace) currentGravity = floatGravity;
 
+        // Void Killplane
+        if (camera.position.y < -500.0f)
+        {
+            camera.position = g_activeRespawnPoint;
+            camera.velocity.y = 0.0f;
+            camera.velocity.x = 0.0f;
+            camera.velocity.z = 0.0f;
+        }
+
         camera.velocity.y += currentGravity;
 
         // ===================================================
@@ -1018,7 +1069,7 @@ namespace vuron {
 
             for (int i : yCandidates)
             {
-                if (m_cubes[i].type != vuron::ShapeType::WEDGE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
+                if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
                 {
                     if (vel.y < 0.0f) // Floor
                     {
@@ -1059,14 +1110,25 @@ namespace vuron {
         // 4. Narrow phase: SAT math
         for (int i : wedgeCandidates)
         {
-            if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+            if (m_cubes[i].type == vuron::ShapeType::WEDGE || m_cubes[i].type == vuron::ShapeType::CUSTOM)
             {
 
                 // Broad phase: Are we inside the AABB? (red box)
                 if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
                 {
-                    vuron::Transform::Plane planes[5];
-                    m_cubes[i].getWedgePlanes(planes);
+                    // Dynamically load the planes depending on the shape type
+                    std::vector<vuron::Transform::Plane> planes;
+                    if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                    {
+                        vuron::Transform::Plane wPlanes[5];
+                        m_cubes[i].getWedgePlanes(wPlanes);
+                        for (int p = 0; p < 5; p++) planes.push_back(wPlanes[p]);
+                    }
+                    else
+                    {
+                        // Load the true CSG planes from TrenchBroom
+                        planes = m_cubes[i].customPlanes;
+                    }
 
                     // Map the player's 3D hitbox
                     vuron::Vector3 center = { (pBox.min.x + pBox.max.x)*0.5f, (pBox.min.y + pBox.max.y)*0.5f, (pBox.min.z + pBox.max.z)*0.5f };
@@ -1076,8 +1138,8 @@ namespace vuron {
                     vuron::Vector3 pushNormal = {0, 0, 0};
                     bool colliding = true;
 
-                    // Narrow phase - SAT check against all 5 planes
-                    for (int p = 0; p < 5; p++)
+                    // Narrow phase - SAT check against all geometric planes dynamically
+                    for (size_t p = 0; p < planes.size(); p++)
                     {
                         // Project the player's radius onto the plane's angle
                         float r = ext.x * std::abs(planes[p].normal.x) +
@@ -1087,7 +1149,7 @@ namespace vuron {
                         // Distance from player center to plane
                         float d = vuron::dot(center, planes[p].normal) - planes[p].distance;
 
-                        // If outside any of the 5 planes, no collisions
+                        // If outside any plane, no collision occurs
                         if (d > r) { colliding = false; break; }
 
                         // Find the plane the player penetrated the least (path of least resistance)
@@ -1101,7 +1163,7 @@ namespace vuron {
 
                     if (colliding)
                     {
-                        // 1. Physically push the player out of the wedge
+                        // 1. Physically push the player out
                         camera.position.x += pushNormal.x * minPenetration;
                         camera.position.y += pushNormal.y * minPenetration;
                         camera.position.z += pushNormal.z * minPenetration;
@@ -1368,6 +1430,12 @@ namespace vuron {
 
             // Calculate this specific cube's final matrix
             vuron::Matrix4x4 modelMatrix = m_cubes[i].getModelMatrix();
+            // Custom vertices are already their exact true size
+            // So we strip the scale out of the matrix here so the GPU doesn't stretch them twice
+            if (m_cubes[i].type == vuron::ShapeType::CUSTOM)
+            {
+                modelMatrix = vuron::Matrix4x4::translation(m_cubes[i].position.x, m_cubes[i].position.y, m_cubes[i].position.z);
+            }
             vuron::Matrix4x4 mvpMatrix = modelMatrix * viewProj;
 
             // Inject the matrix directly into GPU Register slot 1
@@ -1378,6 +1446,10 @@ namespace vuron {
 
             if (m_cubes[i].type == vuron::ShapeType::CUBE)
             {
+
+                // Re-binding the master Vuron buffer just in case a custom object changed it
+                [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
+
                 // Execute the draw using the map, connecting the dots
                 [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                                     indexCount:36
@@ -1387,12 +1459,26 @@ namespace vuron {
             }
             else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
             {
+
+                // Re-binding the master Vuron buffer
+                [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
+
                 // Offset by exactly 72 bytes (36 cube indices * 2 bytes each()
                 [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                                 indexCount:24
                                 indexType:MTLIndexTypeUInt16
                                 indexBuffer:(id<MTLBuffer>)m_indexBuffer
                                 indexBufferOffset:72];
+            }
+            else if (m_cubes[i].type == vuron::ShapeType::CUSTOM && m_cubes[i].customVertexBuffer)
+            {
+                // Binding the specific object's unique geometry buffer
+                [encoder setVertexBuffer:(id<MTLBuffer>)m_cubes[i].customVertexBuffer offset:0 atIndex:0];
+
+                // Custom objects don't use the index map, they just draw raw triangles straight through
+                [encoder drawPrimitives:MTLPrimitiveTypeTriangle
+                        vertexStart:0
+                        vertexCount:m_cubes[i].customVertexCount];
             }
         }
 
@@ -1401,6 +1487,10 @@ namespace vuron {
         // ===========================================
         if (m_showBoundingBoxes)
         {
+
+            // Resetting the GPU to the Master Buffer
+            [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
+
             // Tell the shader to bypass lighting for wireframes
             float wireframeFlag = 1.2f;
             [encoder setFragmentBytes:&wireframeFlag length:sizeof(float) atIndex:2];
@@ -1480,6 +1570,9 @@ namespace vuron {
         // =======================================
         // 1. Switch the GPU to the Inversion pipeline
         [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_uiPipelineState];
+
+        // 1.5. Apply UI Depth State
+        [encoder setDepthStencilState:g_uiDepthState];
 
         // 2. Set the alphaFlag > 1.5 to trigger the crosshair carving-out
         float uiAlpha = 2.0f;

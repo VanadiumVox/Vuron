@@ -269,7 +269,8 @@ namespace vuron
     enum class ShapeType
     {
         CUBE,
-        WEDGE
+        WEDGE,
+        CUSTOM
     };
 
     // A 3D transform that holds position, rotation and scale for any entity
@@ -283,12 +284,22 @@ namespace vuron
         ShapeType type = ShapeType::CUBE; // Default to a cube
         Vector3 normal = {0.0f, 1.0f, 0.0f}; // Only used if it's a wedge
 
+        // Will only be populated if type == CUSTOM
+        std::vector<vuron::Vector3> customTriangles;
+
+        // GPU Memory Handles for Custom geometry
+        void* customVertexBuffer = nullptr;
+        int customVertexCount = 0;
+
         // The definition of a flat surface
         struct Plane
         {
             Vector3 normal;
             float distance;
         };
+
+        // Holds the True Physics Planes
+        std::vector<Plane> customPlanes;
 
         // Dynamically calculates the 5 World-space planes of the wedge, accounting scale and rotation
         void getWedgePlanes(Plane outPlanes[5]) const

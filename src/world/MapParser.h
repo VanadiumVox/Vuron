@@ -162,8 +162,79 @@ namespace vuron
                 return true;
             }
 
-            // --- BRUSH TO VURON SHAPE CONVERTER ---
+            static void triangulateBrush(const MapBrush& brush, const std::vector<vuron::Vector3>& vertices, vuron::Transform& outShape)
+            {
+                for (const auto& plane : brush.planes)
+                {
+                    std::vector<vuron::Vector3> faceVerts;
 
+                    // 1. Gather all vertices that sit flat on this specific plane
+                    for (const auto& v : vertices)
+                    {
+                        float dist = plane.normal.x * v.x + plane.normal.y * v.y + plane.normal.z * v.z;
+                        if (std::abs(dist - plane.distance) < 0.01f)
+                        {
+                            faceVerts.push_back(v);
+                        }
+                    }
+
+                    if (faceVerts.size() >= 3)
+                    {
+                        // 2. Calculate the exact center point of this face
+                        vuron::Vector3 center = {0.0f, 0.0f, 0.0f};
+                        for (const auto& v : faceVerts)
+                        {
+                            center.x += v.x; center.y += v.y; center.z += v.z;
+                        }
+                        center.x /= faceVerts.size();
+                        center.y /= faceVerts.size();
+                        center.z /= faceVerts.size();
+
+                        // 3. Create a local 2D coordinate system (Tangent/Bitangent) to sort the points
+                        vuron::Vector3 up = {0.0f, 1.0f, 0.0f};
+                        if (std::abs(plane.normal.y) > 0.99f) up = {1.0f, 0.0f, 0.0f};
+
+                        vuron::Vector3 tangent =
+                        {
+                            plane.normal.y * up.z - plane.normal.z * up.y,
+                            plane.normal.z * up.x - plane.normal.x * up.z,
+                            plane.normal.x * up.y - plane.normal.y * up.x
+                        };
+                        float tMag = std::sqrt(tangent.x*tangent.x + tangent.y*tangent.y + tangent.z*tangent.z);
+                        tangent.x /= tMag; tangent.y /= tMag; tangent.z /= tMag;
+
+                        vuron::Vector3 bitangent =
+                        {
+                            plane.normal.y * tangent.z - plane.normal.z * tangent.y,
+                            plane.normal.z * tangent.x - plane.normal.x * tangent.z,
+                            plane.normal.x * tangent.y - plane.normal.y * tangent.x
+                        };
+
+                        // 4. Sort the vertices in a circle (Clockwise) so the GPU doesn't draw a mangled mess
+                        std::sort(faceVerts.begin(), faceVerts.end(), [&](const vuron::Vector3& a, const vuron::Vector3& b)
+                        {
+                            vuron::Vector3 da = {a.x - center.x, a.y - center.y, a.z - center.z};
+                            vuron::Vector3 db = {b.x - center.x, b.y - center.y, b.z - center.z};
+
+                            float angleA = std::atan2(da.x*bitangent.x + da.y*bitangent.y + da.z*bitangent.z,
+                                                      da.x*tangent.x + da.y*tangent.y + da.z*tangent.z);
+                            float angleB = std::atan2(db.x*bitangent.x + db.y*bitangent.y + db.z*bitangent.z,
+                                                      db.x*tangent.x + db.y*tangent.y + db.z*tangent.z);
+                            return angleA < angleB;
+                        });
+
+                        // 5. Generate the Triangle Fan and feed it to the struct
+                        for (size_t i = 1; i < faceVerts.size() - 1; ++i)
+                        {
+                            outShape.customTriangles.push_back(faceVerts[0]);
+                            outShape.customTriangles.push_back(faceVerts[i]);
+                            outShape.customTriangles.push_back(faceVerts[i+1]);
+                        }
+                    }
+                }
+            }
+
+            // --- BRUSH TO VURON SHAPE CONVERTER ---
             static std::vector<vuron::Transform> generateShapes(const MapData& data)
             {
                 std::vector<vuron::Transform> shapes;
@@ -220,7 +291,7 @@ namespace vuron
                     shape.scale = { maxB.x - minB.x, maxB.y - minB.y, maxB.z - minB.z };
                     shape.rotation = { 0.0f, 0.0f, 0.0f };
 
-                    // 5 Planes = Wedge, 6 Planes = Cube
+                    // 5 Planes = Wedge, 6 Planes = Cube, Anything else = Custom Triangulated mesh
                     if (numPlanes == 5)
                     {
                         shape.type = vuron::ShapeType::WEDGE;
@@ -239,9 +310,24 @@ namespace vuron
                             }
                         }
                     }
-                    else
+                    else if (numPlanes == 6)
                     {
                         shape.type = vuron::ShapeType::CUBE;
+                    }
+                    else
+                    {
+                        shape.type = vuron::ShapeType::CUSTOM;
+                        // Building the complex brush
+                        triangulateBrush(brush, vertices, shape);
+                    }
+
+                    // Save TrenchBroom planes directly to the physics engine
+                    for (const auto& plane : brush.planes)
+                    {
+                        vuron::Transform::Plane tp;
+                        tp.normal = plane.normal;
+                        tp.distance = plane.distance;
+                        shape.customPlanes.push_back(tp);
                     }
 
                     shapes.push_back(shape);
