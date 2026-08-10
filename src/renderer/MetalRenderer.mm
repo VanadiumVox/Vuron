@@ -1359,47 +1359,55 @@ namespace vuron {
 
 
         // =============================================================
-        // --- Shadow Drop Cast Algorithm ---
+        // --- Smarter Shadow Drop Cast Algorithm ---
         // =============================================================
         float shadowY = -9999.0f;
-        vuron::Vector3 shadowRot = {0.0f, 0.0f, 0.0f};
-        bool shadowOnWedge = false;
+        vuron::Vector3 shadowNormal = {0.0f, 1.0f, 0.0f}; // Default flat floor
         bool drawShadow = false;
 
-        // Shoot a line straight down to find the highest floor beneath us
+        // Shoot a line straight down from the camera
+        vuron::Ray downRay = { camera.position, {0.0f, -1.0f, 0.0f} };
+        float closestFloorDist = 9999.0f;
+
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            vuron::AABB box = m_cubes[i].getHitbox();
+            float hitDist = downRay.intersectsOBB(m_cubes[i]);
 
-            // Check if our X/Z coords are hovering over this specific objext
-            if (camera.position.x >= box.min.x && camera.position.x <= box.max.x &&
-                camera.position.z >= box.min.z && camera.position.z <= box.max.z)
+            // If the floor is directly below us, and it's the closest we've hit
+            if (hitDist > 0.0f && hitDist < closestFloorDist)
+            {
+                closestFloorDist = hitDist;
+                // Calculate exact y coordinate of the floor
+                shadowY = camera.position.y - hitDist;
+
+                // Steal the exact normal of the surface so we can tilt the shadow
+                if (m_cubes[i].type == vuron::ShapeType::CUBE)
                 {
-                    float testY = -9999.0f;
+                    shadowNormal = {0.0f, 1.0f, 0.0f};
+                }
+                else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                {
+                    shadowNormal = m_cubes[i].normal;
+                }
+                else if (m_cubes[i].type == vuron::ShapeType::CUSTOM)
+                {
+                    // For custom geometry, find exactly which plane the ray struck.
+                    for (const auto& plane : m_cubes[i].customPlanes)
+                    {
+                        vuron::Vector3 hitPt = { downRay.origin.x, downRay.origin.y - hitDist, downRay.origin.z };
+                        float d = vuron::dot(hitPt, plane.normal) - plane.distance;
 
-                    if (m_cubes[i].type == vuron::ShapeType::CUBE)
-                    {
-                        testY = box.max.y; // Flat roof
-                    }
-                    else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
-                    {
-                        // Sloped roof. Calculate the exact plane height
-                        float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
-                        testY = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
-                    }
-
-                    // If this object is below us & it's higher than the last floor we checked
-                    if (testY <= camera.position.y && testY > shadowY)
-                    {
-                        shadowY = testY;
-                        shadowRot = m_cubes[i].rotation; // Steal the geometry's exact rotation
-                        shadowOnWedge = (m_cubes[i].type == vuron::ShapeType::WEDGE);
+                        if (std::abs(d) < 0.01f)
+                        {
+                            shadowNormal = plane.normal;
+                            break;
+                        }
                     }
                 }
+            }
         }
 
-        // Optimization: Only draw if the floor is within 100 units
-        if (camera.position.y - shadowY <= 200.0f && shadowY != -9999.0f)
+        // Optimization: Only draw if the floor is within 200 units
         if (camera.position.y - shadowY <= 200.0f && shadowY != -9999.0f)
         {
             drawShadow = true;
@@ -1541,19 +1549,53 @@ namespace vuron {
         // 5. Draw the Shadow (on top of the rest)
         if (drawShadow)
         {
+            // Rebind master buffer so the shadow doesn't read junk memory
+            [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
+
             // Flip the swithc in the Fragment shader to activate transparency & circle math
             float shadowAlpha = 0.5f;
             [encoder setFragmentBytes:&shadowAlpha length:sizeof(float) atIndex:2];
 
-            // Build the shadow matrix manually
-            vuron::Matrix4x4 intrinsicRot = vuron::Matrix4x4::rotationX(shadowOnWedge ? -0.785398f : 0.0f);
-            vuron::Matrix4x4 rx = vuron::Matrix4x4::rotationX(shadowRot.x);
-            vuron::Matrix4x4 ry = vuron::Matrix4x4::rotationY(shadowRot.y);
-            vuron::Matrix4x4 rz = vuron::Matrix4x4::rotationZ(shadowRot.z);
-            // Snap it to exactly 0.01f units above the floor
-            vuron::Matrix4x4 t = vuron::Matrix4x4::translation(camera.position.x, shadowY + 0.01f, camera.position.z);
+            // --- Perfect Normal alignment ---
+            // 1. Create a dynamic rotation matrix from the normal vector
+            vuron::Vector3 up = {0.0f, 1.0f, 0.0f};
+            // If the floor is completely flat, use the X-axis as our reference instead
+            if (std::abs(shadowNormal.y) > 0.99f) up = {1.0f, 0.0f, 0.0f};
 
-            vuron::Matrix4x4 shadowMVP = intrinsicRot * rx * ry * rz * t * viewMatrix * projectionMatrix;
+            // Calculate Right axis: Cross Product of (Up x Normal)
+            vuron::Vector3 right =
+            {
+                up.y * shadowNormal.z - up.z * shadowNormal.y,
+                up.z * shadowNormal.x - up.x * shadowNormal.z,
+                up.x * shadowNormal.y - up.y * shadowNormal.x
+            };
+            float rMag = std::sqrt(right.x*right.x + right.y*right.y + right.z*right.z);
+            if (rMag > 0.0f) { right.x /= rMag; right.y /= rMag; right.z /= rMag; }
+
+            // Calculate Forward axis: Cross Product of (Normal x Right)
+            vuron::Vector3 forward =
+            {
+                shadowNormal.y * right.z - shadowNormal.z * right.y,
+                shadowNormal.z * right.x - shadowNormal.x * right.z,
+                shadowNormal.x * right.y - shadowNormal.y * right.x
+            };
+
+            // Build the rotation matrix directly
+            vuron::Matrix4x4 alignMat = vuron::Matrix4x4::identity();
+            alignMat.m[0][0] = right.x; alignMat.m[0][1] = right.y; alignMat.m[0][2] = right.z;
+            alignMat.m[1][0] = shadowNormal.x; alignMat.m[1][1] = shadowNormal.y; alignMat.m[1][2] = shadowNormal.z;
+            alignMat.m[2][0] = forward.x; alignMat.m[2][1] = forward.y; alignMat.m[2][2] = forward.z;
+
+            // 2. Anti Z-Fighting: Push the shadow strictly OUT along the normal
+            float hover = 0.03f;
+            vuron::Matrix4x4 t = vuron::Matrix4x4::translation(
+                camera.position.x + (shadowNormal.x * hover),
+                shadowY + (shadowNormal.y * hover),
+                camera.position.z + (shadowNormal.z * hover)
+            );
+
+            // Multiply them all together
+            vuron::Matrix4x4 shadowMVP = alignMat * t * viewMatrix * projectionMatrix;
 
             [encoder setVertexBytes:&shadowMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
 
@@ -1568,6 +1610,10 @@ namespace vuron {
         // =======================================
         // --- Draw the UI (Crosshair) ---
         // =======================================
+
+        // Rebind the master buffer so no junk memory
+        [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
+
         // 1. Switch the GPU to the Inversion pipeline
         [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_uiPipelineState];
 

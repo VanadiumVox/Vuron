@@ -291,43 +291,55 @@ namespace vuron
                     shape.scale = { maxB.x - minB.x, maxB.y - minB.y, maxB.z - minB.z };
                     shape.rotation = { 0.0f, 0.0f, 0.0f };
 
-                    // 5 Planes = Wedge, 6 Planes = Cube, Anything else = Custom Triangulated mesh
+                    // -= Strict Shape Routing =-
+                    bool isPerfectCube = false;
+                    if (numPlanes == 6)
+                    {
+                        isPerfectCube = true;
+                        for (const auto& plane : brush.planes)
+                        {
+                            // A perfect unrotated cube must face along exactly one axis
+                            float maxAxis = std::max({std::abs(plane.normal.x), std::abs(plane.normal.y), std::abs(plane.normal.z)});
+                            if (maxAxis < 0.99f)
+                            {
+                                //If it's rotated or skewed, Route to CUSTOM
+                                isPerfectCube = false;
+                                break;
+                            }
+                        }
+                    }
+
                     if (numPlanes == 5)
                     {
                         shape.type = vuron::ShapeType::WEDGE;
-
-                        // Find the sloped face's normal to feed to the physics engine
-                        shape.normal = {0.0f, 0.7071f, 0.7071f}; // Fallback normal
+                        shape.normal = {0.0f, 0.7071f, 0.7071f};
                         for (const auto& plane : brush.planes)
                         {
-                            // Pure axis-aligned planes have a 1.0 or -1.0 in one axis. Slopes don't.
-                            if (std::abs(plane.normal.x) < 0.99f &&
-                                std::abs(plane.normal.y) < 0.99f &&
-                                std::abs(plane.normal.z) < 0.99f)
+                            if (std::abs(plane.normal.x) < 0.99f && std::abs(plane.normal.y) < 0.99f && std::abs(plane.normal.z) < 0.99f)
                             {
                                 shape.normal = plane.normal;
                                 break;
                             }
                         }
                     }
-                    else if (numPlanes == 6)
+                    else if (isPerfectCube)
                     {
                         shape.type = vuron::ShapeType::CUBE;
                     }
                     else
                     {
+                        // Everything else
                         shape.type = vuron::ShapeType::CUSTOM;
-                        // Building the complex brush
                         triangulateBrush(brush, vertices, shape);
-                    }
 
-                    // Save TrenchBroom planes directly to the physics engine
-                    for (const auto& plane : brush.planes)
-                    {
-                        vuron::Transform::Plane tp;
-                        tp.normal = plane.normal;
-                        tp.distance = plane.distance;
-                        shape.customPlanes.push_back(tp);
+                        // Save TrenchBroom planes directly to the physics engine
+                        for (const auto& plane : brush.planes)
+                        {
+                            vuron::Transform::Plane tp;
+                            tp.normal = plane.normal;
+                            tp.distance = plane.distance;
+                            shape.customPlanes.push_back(tp);
+                        }
                     }
 
                     shapes.push_back(shape);

@@ -441,6 +441,50 @@ namespace vuron
         // The universal plane clipper: Hits any convex hull from any angle
         float intersectsOBB(const Transform& t) const
         {
+            // -= True Convex Hull Raycasting for CUSTOM geometry =-
+            if (t.type == ShapeType::CUSTOM)
+            {
+                float tEnter = 0.0f;
+                float tLeave = 99999.0f; // Basically infinity
+
+                for (const auto& plane : t.customPlanes)
+                {
+                    // Calculate the angle of the ray against the plane
+                    float denom = dot(plane.normal, direction);
+                    // Calculating distance from ray's origin to the plane
+                    float dist = plane.distance - dot(plane.normal, origin);
+
+                    if (denom == 0.0f)
+                    {
+                        // Ray is perfectly parallel to the wall. If outside, complete miss
+                        if (dist < 0.0f) return -1.0f;
+                    }
+                    else
+                    {
+                        float tHit = dist / denom;
+                        if (denom < 0.0f)
+                        {
+                            // Ray is pointing INTO the shape (entering)
+                            if (tHit > tEnter) tEnter = tHit;
+                        }
+                        else
+                        {
+                            // Ray is pointint OUT of the shape (leaving)
+                            if (tHit < tLeave) tLeave = tHit;
+                        }
+                    }
+
+                    // If the entry point is further than the exit point, then the ray missed the object
+                    if (tEnter > tLeave) return -1.0f;
+                }
+
+                // If the entire object is behind the camera, it's a miss
+                if (tLeave < 0.0f) return -1.0f;
+
+                // Return the exact distance to the impact point
+                return tEnter;
+            }
+
             // 1. Inverse Translate
             Vector3 o = {origin.x - t.position.x, origin.y - t.position.y, origin.z - t.position.z};
             Vector3 d = direction;
