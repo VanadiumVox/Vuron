@@ -27,6 +27,7 @@ namespace vuron
     struct MapData
     {
         vuron::Vector3 playerSpawn;
+        float playerYaw = 0.0f;
         std::vector<MapBrush> brushes;
     };
 
@@ -96,6 +97,11 @@ namespace vuron
                         if (line.find("\"origin\"") != std::string::npos)
                         {
                             parseOrigin(line, data.playerSpawn);
+                        }
+                        // reading the orientation of the player_start
+                        if (line.find("\"angle\"") != std::string::npos)
+                        {
+                            parseAngle(line, data.playerYaw);
                         }
                     }
 
@@ -309,20 +315,7 @@ namespace vuron
                         }
                     }
 
-                    if (numPlanes == 5)
-                    {
-                        shape.type = vuron::ShapeType::WEDGE;
-                        shape.normal = {0.0f, 0.7071f, 0.7071f};
-                        for (const auto& plane : brush.planes)
-                        {
-                            if (std::abs(plane.normal.x) < 0.99f && std::abs(plane.normal.y) < 0.99f && std::abs(plane.normal.z) < 0.99f)
-                            {
-                                shape.normal = plane.normal;
-                                break;
-                            }
-                        }
-                    }
-                    else if (isPerfectCube)
+                    if (isPerfectCube)
                     {
                         shape.type = vuron::ShapeType::CUBE;
                     }
@@ -365,6 +358,21 @@ namespace vuron
                     spawn.x = -tx * scale;
                     spawn.y = tz * scale;
                     spawn.z = -ty * scale;
+                }
+            }
+
+            static void parseAngle(const std::string& line, float& yaw)
+            {
+                size_t firstQuote = line.find_first_of('"', 7);
+                if (firstQuote != std::string::npos)
+                {
+                    size_t secondQuote = line.find_first_of('"', firstQuote + 1);
+                    std::string val = line.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+                    float angleDeg = std::stof(val);
+
+                    // Converting TrenchBroom degrees to Vuron Radians.
+                    // Offset by 90º so looking "0" in TrenchBroom aligns with vuron's 'forward' vector
+                    yaw = (angleDeg - 90.0f) * (3.14159265f / 180.0f);
                 }
             }
 

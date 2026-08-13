@@ -622,8 +622,13 @@ namespace vuron {
             if (levelPath.length() >= 4 && levelPath.substr(levelPath.length() - 4) == ".map")
             {
                 vuron::MapData mapData = vuron::MapParser::loadMap(levelPath);
+
+                // --- Set Position and Rotation ---
                 camera.position = mapData.playerSpawn;
+                camera.yaw = mapData.playerYaw; // Auto-look where the entity is pointing
                 g_activeRespawnPoint = mapData.playerSpawn;
+                // ---------------------------------------------------
+
                 m_cubes = vuron::MapParser::generateShapes(mapData);
 
                 // -- GPU Bake Pass: Compiling custom Geometry

@@ -185,6 +185,6 @@
 // entity 1
 {
 "classname" "player_start"
-"origin" "0 96 40"
-"angle" "270"
+"origin" "0 -160 40"
+"angle" "300"
 }
