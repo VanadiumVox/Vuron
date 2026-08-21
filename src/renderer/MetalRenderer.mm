@@ -111,6 +111,18 @@ namespace vuron {
             }
             m_keyR = isPressed;
         }
+
+        // Weapon Swap logic
+        if (key == 'g')
+        {
+            m_keyG = isPressed;
+            if (!isPressed)
+            {
+                // Reset the mechanic instantly if the player lets go early
+                m_swapHoldTimer = 0;
+                m_weaponJustSwapped = false;
+            }
+        }
     }
     // ---------------------------------------------------------
 
@@ -129,6 +141,15 @@ namespace vuron {
             m_mouseJustClicked = true; // Captures the frame it was clicked
         }
         m_mouseLeftDown = isPressed;
+    }
+
+    void MetalRenderer::setRightMouseState(bool isPressed)
+    {
+        if (isPressed && !m_mouseRightDown)
+        {
+            m_mouseRightJustClicked = true; // Captures the frame it was clicked
+        }
+        m_mouseRightDown = isPressed;
     }
 
     // ==========================================
@@ -524,8 +545,8 @@ namespace vuron {
         m_mouseDeltaY = 0.0f;
 
         // Adding bounds to the pitch so camera doesn't snap its neck
-        if (camera.pitch > 1.5f) camera.pitch = 1.5f; // Max look down (about 85º)
-        if (camera.pitch < -1.5f) camera.pitch = -1.5f; // Max look up (about the same)
+        if (camera.pitch > 1.5707f) camera.pitch = 1.5707f; // Max look down (about 85º)
+        if (camera.pitch < -1.5707f) camera.pitch = -1.5707f; // Max look up (about the same)
         //---------------------
 
         // 2. Defining the entities(just saw the backrooms movie, ts wasn't really scary)
@@ -590,6 +611,25 @@ namespace vuron {
             }
         }
         // --------------------------
+
+        // -= Weapon Swap Logic =-
+        if (m_keyG && !m_weaponJustSwapped)
+        {
+            m_swapHoldTimer++;
+
+            // If we hit hit the final amount, execute swap
+            if (m_swapHoldTimer >= SWAP_COMPLETE)
+            {
+                if (m_currentWeapon == Weapon::GRAPPLE) m_currentWeapon = Weapon::ROCKET;
+                else m_currentWeapon = Weapon::GRAPPLE;
+
+                m_weaponJustSwapped = true; // Lock it
+                m_swapHoldTimer = 0; // Reset timer
+
+                // TODO: Add a weapon-swap sound effect or FOV punch or something idk
+            }
+        }
+        // ------------------------------------------
 
         // Initialize the level (Only runs on the very first frame)
         if (!m_levelLoaded)
@@ -691,582 +731,631 @@ namespace vuron {
         }
 
         // ===============================================
-        // -= Unified Physics and Movement Engine =-
+        // -= `Unified` Physics and Movement Engine =-
         // ===============================================
-        float speed = 0.1f;
-
-        // --- The Grappling Hook logic (yeah, I know, it's weird up here too but makes sense) ---
-        // Inputs are consumed instantly, no queues
-        if (m_mouseJustClicked)
+        if (m_hitstopTimer > 0)
         {
-            m_mouseJustClicked = false; // Consume the click
+            m_hitstopTimer--; // Tick down
+        }
+        else {
 
-            if (!camera.isGrappling)
+            // --- The Grappling Hook logic (yeah, I know, it's weird up here too but makes sense) ---
+            // Inputs are consumed instantly, no queues
+            if (m_mouseJustClicked)
             {
-                // Deny firing midair if no charges left
-                if (!camera.isGrounded && camera.currentAirGrapples <= 0)
-                {
-                    // Do nothing
-                }
-                else
-                {
-                    // Generate a ray from the player's eye, shooting straight forward.
-                    vuron::Ray grappleRay = { camera.position, camera.getForwardVector() };
+                m_mouseJustClicked = false; // Consume the click
 
-                    float closestHit = 9999.0f;
-                    int hitTarget = -1;
-
-                    // Scan the world to find the closest pierce point
-                    for (size_t i = 0; i < m_cubes.size(); ++i)
+                if (m_currentWeapon == vuron::Weapon::GRAPPLE)
+                {
+                    if (!camera.isGrappling)
                     {
-                        float hitDistance = grappleRay.intersectsOBB(m_cubes[i]);
-
-                        // Valid hit must be in front of camera.
-                        if (hitDistance > 0.1f && hitDistance < closestHit)
+                        // Deny firing midair if no charges left
+                        if (!camera.isGrounded && camera.currentAirGrapples <= 0)
                         {
-                            closestHit = hitDistance;
-                            hitTarget = (int)i;
+                            // Do nothing
                         }
-                    }
-
-                    // Locking the state machine
-                    if (hitTarget != -1)
-                    {
-                        camera.isGrappling = true;
-                        camera.hookedEntityIndex = hitTarget;
-
-                        // Projecting the ray endpoints to get the final coordinate
-                        camera.grapplePoint =
+                        else
                         {
-                            grappleRay.origin.x + (grappleRay.direction.x * closestHit),
-                            grappleRay.origin.y + (grappleRay.direction.y * closestHit),
-                            grappleRay.origin.z + (grappleRay.direction.z * closestHit)
-                        };
+                            // Generate a ray from the player's eye, shooting straight forward.
+                            vuron::Ray grappleRay = { camera.position, camera.getForwardVector() };
 
-                        // Midair use consumes an air charge
-                        if (!camera.isGrounded)
-                        {
-                            camera.currentAirGrapples--;
+                            float closestHit = 9999.0f;
+                            int hitTarget = -1;
+
+                            // Scan the world to find the closest pierce point
+                            for (size_t i = 0; i < m_cubes.size(); ++i)
+                            {
+                                float hitDistance = grappleRay.intersectsOBB(m_cubes[i]);
+
+                                // Valid hit must be in front of camera.
+                                if (hitDistance > 0.1f && hitDistance < closestHit)
+                                {
+                                    closestHit = hitDistance;
+                                    hitTarget = (int)i;
+                                }
+                            }
+
+                            // Locking the state machine
+                            if (hitTarget != -1)
+                            {
+                                camera.isGrappling = true;
+                                camera.hookedEntityIndex = hitTarget;
+
+                                // Projecting the ray endpoints to get the final coordinate
+                                camera.grapplePoint =
+                                {
+                                    grappleRay.origin.x + (grappleRay.direction.x * closestHit),
+                                    grappleRay.origin.y + (grappleRay.direction.y * closestHit),
+                                    grappleRay.origin.z + (grappleRay.direction.z * closestHit)
+                                };
+
+                                // Midair use consumes an air charge
+                                if (!camera.isGrounded)
+                                {
+                                    camera.currentAirGrapples--;
+                                }
+                            }
                         }
-                    }
-                }
-            }
-            else
-            {
-                // if already grappling, a second click detaches
-                camera.isGrappling = false;
-            }
-        }
-
-        // Trigonometry: Calculate exatly which way "Forwards" and "Right" are based on player's yaw
-        float fwdX = std::sin(camera.yaw);
-        float fwdZ = std::cos(camera.yaw);
-        float rightX = std::cos(camera.yaw);
-        float rightZ = -std::sin(camera.yaw);
-
-        // -=Crouching and Anti-clip Logic=-
-        bool wantCrouch = m_keyShift;
-
-        if (wantCrouch && !camera.isCrouched) {
-            // Initiate crouch
-            camera.isCrouched = true;
-            // Shift eyes down by 1 unit. Because hitbox moves down by 1.0,
-            // The feet remain in the exact same physical location
-            camera.position.y -= 0.5f;
-            // Strict Rocket Lock: Only allow if crouching started midair
-            if (!camera.isGrounded) {
-                camera.crouchedMidAir = true;
-            } else {
-                // --= Wavedash Combo Logic =--
-                bool isMoving = (m_activeX != 0 || m_activeZ != 0);
-
-                if (isMoving) {
-
-                    //Did they maintain the same directional input?
-                    if (m_activeX == m_lastWavedashKeyX && m_activeZ == m_lastWavedashKeyZ) {
-
-                        // Is the combo timer still alive?
-                        if (m_wavedashWindow > 0) {
-                            m_currentMomentum += 0.05f; // The wavedash burst
-                            float wavedashCap = 0.5f; // Wavedash soft cap
-                            if (m_currentMomentum > wavedashCap) m_currentMomentum = wavedashCap;
-                        }
-                    } else {
-                        // The penalty; they pressed shift while changing directions on the ground
-                        m_currentMomentum = 0.1f;
-                    }
-
-                    // Refresh the combo timer (approx 15 frames to execute the next crouch)
-                    m_wavedashWindow = 15;
-
-                    // Save current direction for the next dash check
-                    m_lastWavedashKeyX = m_activeX;
-                    m_lastWavedashKeyZ = m_activeZ;
-                }
-            }
-        }
-        else if (!wantCrouch && camera.isCrouched) {
-            // Attempt uncrouch (anti-clip check)
-            // We project a "Ghost box" representing what the player's hitbox would look like standing
-            vuron::AABB ghostBox = {
-                {camera.position.x - 0.5f, (camera.position.y + 0.5f) - 2.0f, camera.position.z - 0.5f},
-                {camera.position.x + 0.5f, (camera.position.y + 0.5f) + 0.2f, camera.position.z + 0.5f}
-            };
-
-            bool ceilingClear = true;
-            for (size_t i = 0; i < m_cubes.size(); ++i)
-            {
-                if (vuron::AABB::checkCollision(ghostBox, m_cubes[i].getHitbox()))
-                {
-                    if (m_cubes[i].type == vuron::ShapeType::CUBE)
-                    {
-                        ceilingClear = false; // Hit ceiling
-                        break;
-                    }
-                    else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
-                    {
-                        // Calculate the slope height at the ghost box's position
-                        float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
-                        float slopeH = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
-
-                        // If our head is below the slanted roof, we are trapped
-                        if (ghostBox.max.y < slopeH)
-                        {
-                            ceilingClear = false;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (ceilingClear) {
-                // Execute Uncrouch
-                camera.isCrouched = false;
-                camera.position.y += 0.5f; // Raise the eyes back up
-            }
-        }
-        // --------------------------------
-
-        // ==============================================
-        // -= 1. Intended Movement & Directional Math =-
-        // ==============================================
-        float baseSpeed = 0.1f;
-        float sprintCap = 0.5f;
-        float absoluteCeiling = 1.0f;
-        float acceleration = 0.0025f;
-
-        bool isMoving = (m_activeX != 0 || m_activeZ != 0);
-
-        // -- Long Jump Decay Phase --
-        if (m_isBoosting)
-        {
-            m_currentMomentum -= 0.015f;
-            if (m_currentMomentum <= 0.35f)
-            {
-                m_currentMomentum = 0.35f;
-                m_isBoosting = false;
-            }
-        }
-
-        // -- Standard Coasting and Acceleration --
-        else if (!isMoving)
-        {
-            m_isAccelerating = false;
-            m_currentMomentum = baseSpeed;
-        }
-        else
-        {
-            if (m_isAccelerating && m_currentMomentum < sprintCap)
-            {
-                m_currentMomentum += acceleration;
-                if (m_currentMomentum > sprintCap) m_currentMomentum = sprintCap;
-            }
-        }
-
-        if (m_currentMomentum > absoluteCeiling) m_currentMomentum = absoluteCeiling;
-
-        // Get raw directional inputs (-1, 0, or 1)
-        float inputX = 0.0f;
-        float inputZ = 0.0f;
-        if (m_activeZ == 'w') inputZ = 1.0f;
-        else if (m_activeZ == 's') inputZ = -1.0f;
-        if (m_activeX == 'd') inputX = 1.0f;
-        else if (m_activeX == 'a') inputX = -1.0f;
-
-        // 1. Calculate the pure intended direction
-        float targetDirX = (inputZ * fwdX + inputX * rightX);
-        float targetDirZ = (inputZ * fwdZ + inputX * rightZ);
-
-        float dirMag = std::sqrt(targetDirX * targetDirX + targetDirZ * targetDirZ);
-        if (dirMag > 0.0f)
-        {
-            targetDirX /= dirMag;
-            targetDirZ /= dirMag;
-        }
-
-        // 2. Apply the throttle (momentum is preserved)
-        float moveX = targetDirX * m_currentMomentum;
-        float moveZ = targetDirZ * m_currentMomentum;
-
-        // =============================================
-        //  -= 2. Gravity Calculations =-
-        // =============================================
-        float baseGravity = -0.008f;
-        float floatGravity = -0.002f;
-        float heavyGravity = -0.02f;
-        float jumpForce = 0.15f;
-        float fastFallGravity = -0.025f;
-
-        float currentGravity = baseGravity;
-        if (camera.velocity.y > 0.0f && !m_keySpace) currentGravity = heavyGravity;
-        else if (camera.velocity.y < 0.0f && m_keyShift) currentGravity = fastFallGravity;
-        else if (camera.velocity.y < 0.0f && m_keySpace) currentGravity = floatGravity;
-
-        // Void Killplane
-        if (camera.position.y < -500.0f)
-        {
-            camera.position = g_activeRespawnPoint;
-            camera.velocity.y = 0.0f;
-            camera.velocity.x = 0.0f;
-            camera.velocity.z = 0.0f;
-        }
-
-        camera.velocity.y += currentGravity;
-
-        // ===================================================
-        // -= 3. Unified Vector Physics & Clipping =-
-        // ===================================================
-
-        // --- Pendulum Math & Tension ---
-        // 1. Combining intent with velocity to get momentum
-        float totalVx = moveX + camera.velocity.x;
-        float totalVy = camera.velocity.y;
-        float totalVz = moveZ + camera.velocity.z;
-
-        if (camera.isGrappling)
-        {
-            // Camera 3D Vector to the hook point
-            float dx = camera.grapplePoint.x - camera.position.x;
-            float dy = camera.grapplePoint.y - camera.position.y;
-            float dz = camera.grapplePoint.z - camera.position.z;
-
-            // Pythagoras (my math teacher was right.)
-            float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
-
-            if (distance > 0.0f)
-            {
-                // Normalize the direction to the hook
-                float nx = dx / distance;
-                float ny = dy / distance;
-                float nz = dz / distance;
-
-                if (camera.isGrounded && ny > 0.1f)
-                {
-                    totalVy += 0.08f;
-                    camera.isGrounded = false;
-                }
-
-                // 2. Tension: Project velocity to delete movement away from the pivot
-                float velocityAway = (totalVx * -nx) + (totalVy * -ny) + (totalVz * -nz);
-
-                if (velocityAway > 0)
-                {
-                    totalVx += nx * velocityAway;
-                    totalVy += ny * velocityAway;
-                    totalVz += nz * velocityAway;
-                }
-
-                // Radius-based dampening
-                if (distance < 4.0f)
-                {
-                    // Dampen curve: 0.0 (center) to 1.0 (edge of deadzone)
-                    float dampen = distance / 4.0f;
-                    // Heavily multiply the velocity by smaller numbers as you aproach the point
-                    float friction = 0.85f + (0.10f * dampen);
-
-                    totalVx *= friction;
-                    totalVy *= friction;
-                    totalVz *= friction;
-                }
-                else
-                {
-                    // Standard air resistance for larger, wider swings
-                    totalVx *= 0.995f;
-                    totalVy *= 0.995f;
-                    totalVz *= 0.995f;
-                }
-
-                // 3. The auto-retract (towards the anchor point)
-                float retractSpeed = 0.05f;
-                totalVx += nx * retractSpeed;
-                totalVy += ny * retractSpeed;
-                totalVz += nz * retractSpeed;
-
-                // Dampening swing more since holding space fuckin launches ya
-//                 float maxSwingHeight = 0.22f;
-//                 if (totalVy > maxSwingHeight)
-//                 {
-//                     totalVy = maxSwingHeight;
-//                 }
-            }
-
-            // 4. Extract the orbital physics back out to separate it from WASD movement
-            camera.velocity.x = totalVx - moveX;
-            camera.velocity.y = totalVy;
-            camera.velocity.z = totalVz - moveZ;
-        }
-        else
-        {
-            // Air friction: If we aren't grappling, slowly decay existing orbital momentum
-            camera.velocity.x *= 0.95f;
-            camera.velocity.z *= 0.95f;
-
-            // Recalculating the totals using the decayed momentum
-            totalVx = moveX + camera.velocity.x;
-            totalVz = moveZ + camera.velocity.z;
-        }
-
-        // ----------------------------------------------------
-
-        // Apply everything to the final velocity vector
-        vuron::Vector3 vel = {totalVx, camera.velocity.y, totalVz};
-        float currentHeight = camera.isCrouched ? 1.5f : 2.0f;
-        camera.isGrounded = false;
-
-        // -- Flat Geometry Pass (X & Z)
-
-        // X-Axis
-        camera.position.x += vel.x;
-        vuron::AABB xBox = camera.getHitbox();
-        // Lift the feet slightly so we glide over floor polygons instead of snagging
-        xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
-        const std::vector<int>& xCandidates = m_grid.query(xBox);
-        for (int i : xCandidates)
-        {
-            if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox())) {
-                camera.position.x -= vel.x; vel.x = 0.0f; break;
-            }
-        }
-
-        // Z-Axis
-        camera.position.z += vel.z;
-        vuron::AABB zBox = camera.getHitbox();
-        // Lift feet to glide over floors, yadda yaddda
-        zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
-        const std::vector<int>& zCandidates = m_grid.query(zBox);
-        for (int i : zCandidates)
-        {
-            if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox())) {
-                camera.position.z -= vel.z; vel.z = 0.0f; break;
-            }
-        }
-
-        // -- Y-Axis Pass (Gravity & Floors) --
-
-        // Time Slicing: Breaks massive speeds into safer, 0.25 unit chunks
-        int ySteps = std::max(1, (int)std::ceil(std::abs(vel.y) / 0.25f));
-        float stepY = vel.y / ySteps;
-
-        for (int s = 0; s < ySteps; ++s)
-        {
-            camera.position.y += stepY;
-            const std::vector<int>& yCandidates = m_grid.query(camera.getHitbox());
-
-            for (int i : yCandidates)
-            {
-                if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
-                {
-                    if (vel.y < 0.0f) // Floor
-                    {
-                        camera.position.y = m_cubes[i].getHitbox().max.y + currentHeight + 0.001f;
-                        camera.isGrounded = true;
-                        camera.currentAirGrapples = camera.maxAirGrapples;
-                        camera.crouchedMidAir = false;
-
-                        // Geometry Cleanup
-                        // Friction: Stops infinite sliding, but doesn't force-detach the grapple
-                        camera.velocity.x *= 0.5f;
-                        camera.velocity.z *= 0.5f;
-                    }
-                    else if (vel.y > 0.0f) // Ceiling
-                    {
-                        camera.position.y = m_cubes[i].getHitbox().min.y - 0.201f;
-                    }
-                    vel.y = 0.0f;
-                    stepY = 0.0f; // Halt the time-slice loop
-                    break;
-                }
-            }
-            // If we hit a floor or ceiling, exit the time-slice loop
-            if (vel.y == 0.0f) break;
-        }
-
-        // -- Convex Hull Wedge Pass --
-        // 1. Getting the base hitbox
-        vuron::AABB pBox = camera.getHitbox();
-
-        // 2. Anti-phasing: Stretch hitbox to prevent clipping
-        if (vel.y < 0.0f) pBox.max.y -= vel.y;
-        else if (vel.y > 0.0f) pBox.min.y -= vel.y;
-
-        // 3. Broad phase: Query the grid using the stretched hitbox
-        const std::vector<int>& wedgeCandidates = m_grid.query(pBox);
-
-        // 4. Narrow phase: SAT math
-        for (int i : wedgeCandidates)
-        {
-            if (m_cubes[i].type == vuron::ShapeType::WEDGE || m_cubes[i].type == vuron::ShapeType::CUSTOM)
-            {
-
-                // Broad phase: Are we inside the AABB? (red box)
-                if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
-                {
-                    // Dynamically load the planes depending on the shape type
-                    std::vector<vuron::Transform::Plane> planes;
-                    if (m_cubes[i].type == vuron::ShapeType::WEDGE)
-                    {
-                        vuron::Transform::Plane wPlanes[5];
-                        m_cubes[i].getWedgePlanes(wPlanes);
-                        for (int p = 0; p < 5; p++) planes.push_back(wPlanes[p]);
                     }
                     else
                     {
-                        // Load the true CSG planes from TrenchBroom
-                        planes = m_cubes[i].customPlanes;
+                        // if already grappling, a second click detaches
+                        camera.isGrappling = false;
                     }
+                }
+                else if (m_currentWeapon == vuron::Weapon::ROCKET)
+                {
+                    // Fire the Rocket
+                    int idx = m_nextRocketIndex;
+                    m_rockets[idx].isActive = true;
+                    m_rockets[idx].bounceCount = 0;
 
-                    // Map the player's 3D hitbox
-                    vuron::Vector3 center = { (pBox.min.x + pBox.max.x)*0.5f, (pBox.min.y + pBox.max.y)*0.5f, (pBox.min.z + pBox.max.z)*0.5f };
-                    vuron::Vector3 ext = { (pBox.max.x - pBox.min.x)*0.5f, (pBox.max.y - pBox.min.y)*0.5f, (pBox.max.z - pBox.min.z)*0.5f };
+                    vuron::Vector3 fwd = camera.getForwardVector();
 
-                    float minPenetration = 9999.0f;
-                    vuron::Vector3 pushNormal = {0, 0, 0};
-                    bool colliding = true;
-
-                    // Narrow phase - SAT check against all geometric planes dynamically
-                    for (size_t p = 0; p < planes.size(); p++)
+                    // Spawn it slightly in front of the camera so we don't shoot our own hitboxes
+                    m_rockets[idx].position =
                     {
-                        // Project the player's radius onto the plane's angle
-                        float r = ext.x * std::abs(planes[p].normal.x) +
-                                  ext.y * std::abs(planes[p].normal.y) +
-                                  ext.z * std::abs(planes[p].normal.z);
+                        camera.position.x + (fwd.x * 0.5f),
+                        camera.position.y + (fwd.y * 0.5f),
+                        camera.position.z + (fwd.z * 0.5f)
+                    };
 
-                        // Distance from player center to plane
-                        float d = vuron::dot(center, planes[p].normal) - planes[p].distance;
+                    // Set the speed (1.0f units per frame is FAST)
+                    float rocketSpeed = 1.0f;
+                    m_rockets[idx].velocity = {fwd.x * rocketSpeed, fwd.y * rocketSpeed, fwd.z * rocketSpeed};
 
-                        // If outside any plane, no collision occurs
-                        if (d > r) { colliding = false; break; }
+                    // Cycle the ring buffer back to 0
+                    m_nextRocketIndex = (m_nextRocketIndex + 1) % MAX_ROCKETS;
+                }
+            }
 
-                        // Find the plane the player penetrated the least (path of least resistance)
-                        float pen = r - d;
-                        if (pen < minPenetration)
+            // --- Parry Trigger ---
+            if (m_mouseRightJustClicked)
+            {
+                m_mouseRightJustClicked = false;
+
+                // Only allow parrying if you have the Rocket Launcher out and aren't already parrying
+                // (This (I think) will be changed later for global parrying)
+                if (m_currentWeapon == vuron::Weapon::ROCKET && m_parryActiveFrames == 0)
+                {
+                    m_parryActiveFrames = 15; // 15 frames of parry window
+                }
+            }
+
+            if (m_parryActiveFrames > 0) m_parryActiveFrames--;
+
+            // Trigonometry: Calculate exatly which way "Forwards" and "Right" are based on player's yaw
+            float fwdX = std::sin(camera.yaw);
+            float fwdZ = std::cos(camera.yaw);
+            float rightX = std::cos(camera.yaw);
+            float rightZ = -std::sin(camera.yaw);
+
+            // -=Crouching and Anti-clip Logic=-
+            bool wantCrouch = m_keyShift;
+
+            if (wantCrouch && !camera.isCrouched) {
+                // Initiate crouch
+                camera.isCrouched = true;
+                // Shift eyes down by 1 unit. Because hitbox moves down by 1.0,
+                // The feet remain in the exact same physical location
+                camera.position.y -= 0.5f;
+                // Strict Rocket Lock: Only allow if crouching started midair
+                if (!camera.isGrounded) {
+                    camera.crouchedMidAir = true;
+                } else {
+                    // --= Wavedash Combo Logic =--
+                    bool isMoving = (m_activeX != 0 || m_activeZ != 0);
+
+                    if (isMoving) {
+
+                        //Did they maintain the same directional input?
+                        if (m_activeX == m_lastWavedashKeyX && m_activeZ == m_lastWavedashKeyZ) {
+
+                            // Is the combo timer still alive?
+                            if (m_wavedashWindow > 0) {
+                                m_currentMomentum += 0.05f; // The wavedash burst
+                                float wavedashCap = 0.5f; // Wavedash soft cap
+                                if (m_currentMomentum > wavedashCap) m_currentMomentum = wavedashCap;
+                            }
+                        } else {
+                            // The penalty; they pressed shift while changing directions on the ground
+                            m_currentMomentum = 0.1f;
+                        }
+
+                        // Refresh the combo timer (approx 15 frames to execute the next crouch)
+                        m_wavedashWindow = 15;
+
+                        // Save current direction for the next dash check
+                        m_lastWavedashKeyX = m_activeX;
+                        m_lastWavedashKeyZ = m_activeZ;
+                    }
+                }
+            }
+            else if (!wantCrouch && camera.isCrouched) {
+                // Attempt uncrouch (anti-clip check)
+                // We project a "Ghost box" representing what the player's hitbox would look like standing
+                vuron::AABB ghostBox = {
+                    {camera.position.x - 0.5f, (camera.position.y + 0.5f) - 2.0f, camera.position.z - 0.5f},
+                    {camera.position.x + 0.5f, (camera.position.y + 0.5f) + 0.2f, camera.position.z + 0.5f}
+                };
+
+                bool ceilingClear = true;
+                for (size_t i = 0; i < m_cubes.size(); ++i)
+                {
+                    if (vuron::AABB::checkCollision(ghostBox, m_cubes[i].getHitbox()))
+                    {
+                        if (m_cubes[i].type == vuron::ShapeType::CUBE)
                         {
-                            minPenetration = pen;
-                            pushNormal = planes[p].normal;
+                            ceilingClear = false; // Hit ceiling
+                            break;
+                        }
+                        else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                        {
+                            // Calculate the slope height at the ghost box's position
+                            float ny = m_cubes[i].normal.y == 0.0f ? 0.0001f : m_cubes[i].normal.y;
+                            float slopeH = m_cubes[i].position.y - ((m_cubes[i].normal.x * (camera.position.x - m_cubes[i].position.x) + m_cubes[i].normal.z * (camera.position.z - m_cubes[i].position.z)) / ny);
+
+                            // If our head is below the slanted roof, we are trapped
+                            if (ghostBox.max.y < slopeH)
+                            {
+                                ceilingClear = false;
+                                break;
+                            }
                         }
                     }
+                }
 
-                    if (colliding)
+                if (ceilingClear) {
+                    // Execute Uncrouch
+                    camera.isCrouched = false;
+                    camera.position.y += 0.5f; // Raise the eyes back up
+                }
+            }
+            // --------------------------------
+
+            // ==============================================
+            // -= 1. Intended Movement & Directional Math =-
+            // ==============================================
+            float baseSpeed = 0.1f;
+            float sprintCap = 0.5f;
+            float absoluteCeiling = 1.0f;
+            float acceleration = 0.0025f;
+
+            bool isMoving = (m_activeX != 0 || m_activeZ != 0);
+
+            // -- Long Jump Decay Phase --
+            if (m_isBoosting)
+            {
+                m_currentMomentum -= 0.015f;
+                if (m_currentMomentum <= 0.35f)
+                {
+                    m_currentMomentum = 0.35f;
+                    m_isBoosting = false;
+                }
+            }
+
+            // -- Standard Coasting and Acceleration --
+            else if (!isMoving)
+            {
+                m_isAccelerating = false;
+                m_currentMomentum = baseSpeed;
+            }
+            else
+            {
+                if (m_isAccelerating && m_currentMomentum < sprintCap)
+                {
+                    m_currentMomentum += acceleration;
+                    if (m_currentMomentum > sprintCap) m_currentMomentum = sprintCap;
+                }
+            }
+
+            if (m_currentMomentum > absoluteCeiling) m_currentMomentum = absoluteCeiling;
+
+            // Get raw directional inputs (-1, 0, or 1)
+            float inputX = 0.0f;
+            float inputZ = 0.0f;
+            if (m_activeZ == 'w') inputZ = 1.0f;
+            else if (m_activeZ == 's') inputZ = -1.0f;
+            if (m_activeX == 'd') inputX = 1.0f;
+            else if (m_activeX == 'a') inputX = -1.0f;
+
+            // 1. Calculate the pure intended direction
+            float targetDirX = (inputZ * fwdX + inputX * rightX);
+            float targetDirZ = (inputZ * fwdZ + inputX * rightZ);
+
+            float dirMag = std::sqrt(targetDirX * targetDirX + targetDirZ * targetDirZ);
+            if (dirMag > 0.0f)
+            {
+                targetDirX /= dirMag;
+                targetDirZ /= dirMag;
+            }
+
+            // 2. Apply the throttle (momentum is preserved)
+            float moveX = targetDirX * m_currentMomentum;
+            float moveZ = targetDirZ * m_currentMomentum;
+
+            // =============================================
+            //  -= 2. Gravity Calculations =-
+            // =============================================
+            float baseGravity = -0.008f;
+            float floatGravity = -0.002f;
+            float heavyGravity = -0.02f;
+            float jumpForce = 0.15f;
+            float fastFallGravity = -0.025f;
+
+            float currentGravity = baseGravity;
+            if (camera.velocity.y > 0.0f && !m_keySpace) currentGravity = heavyGravity;
+            else if (camera.velocity.y < 0.0f && m_keyShift) currentGravity = fastFallGravity;
+            else if (camera.velocity.y < 0.0f && m_keySpace) currentGravity = floatGravity;
+
+            // Void Killplane
+            if (camera.position.y < -500.0f)
+            {
+                camera.position = g_activeRespawnPoint;
+                camera.velocity.y = 0.0f;
+                camera.velocity.x = 0.0f;
+                camera.velocity.z = 0.0f;
+            }
+
+            camera.velocity.y += currentGravity;
+
+            // ===================================================
+            // -= 3. Unified Vector Physics & Clipping =-
+            // ===================================================
+
+            // --- Pendulum Math & Tension ---
+            // 1. Combining intent with velocity to get momentum
+            float totalVx = moveX + camera.velocity.x;
+            float totalVy = camera.velocity.y;
+            float totalVz = moveZ + camera.velocity.z;
+
+            if (camera.isGrappling)
+            {
+                // Camera 3D Vector to the hook point
+                float dx = camera.grapplePoint.x - camera.position.x;
+                float dy = camera.grapplePoint.y - camera.position.y;
+                float dz = camera.grapplePoint.z - camera.position.z;
+
+                // Pythagoras (my math teacher was right.)
+                float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+                if (distance > 0.0f)
+                {
+                    // Normalize the direction to the hook
+                    float nx = dx / distance;
+                    float ny = dy / distance;
+                    float nz = dz / distance;
+
+                    if (camera.isGrounded && ny > 0.1f)
                     {
-                        // 1. Physically push the player out
-                        camera.position.x += pushNormal.x * minPenetration;
-                        camera.position.y += pushNormal.y * minPenetration;
-                        camera.position.z += pushNormal.z * minPenetration;
+                        totalVy += 0.08f;
+                        camera.isGrounded = false;
+                    }
 
-                        // 2. Kill velocity moving into the wall
-                        float impact = vuron::dot(vel, pushNormal);
-                        if (impact < 0.0f)
-                        {
-                            vel.x -= pushNormal.x * impact;
-                            vel.y -= pushNormal.y * impact;
-                            vel.z -= pushNormal.z * impact;
-                        }
+                    // 2. Tension: Project velocity to delete movement away from the pivot
+                    float velocityAway = (totalVx * -nx) + (totalVy * -ny) + (totalVz * -nz);
 
-                        // 3. if the plane we hit was flat enough to stand on
-                        if (pushNormal.y > 0.7f)
+                    if (velocityAway > 0)
+                    {
+                        totalVx += nx * velocityAway;
+                        totalVy += ny * velocityAway;
+                        totalVz += nz * velocityAway;
+                    }
+
+                    // Radius-based dampening
+                    if (distance < 4.0f)
+                    {
+                        // Dampen curve: 0.0 (center) to 1.0 (edge of deadzone)
+                        float dampen = distance / 4.0f;
+                        // Heavily multiply the velocity by smaller numbers as you aproach the point
+                        float friction = 0.85f + (0.10f * dampen);
+
+                        totalVx *= friction;
+                        totalVy *= friction;
+                        totalVz *= friction;
+                    }
+                    else
+                    {
+                        // Standard air resistance for larger, wider swings
+                        totalVx *= 0.995f;
+                        totalVy *= 0.995f;
+                        totalVz *= 0.995f;
+                    }
+
+                    // 3. The auto-retract (towards the anchor point)
+                    float retractSpeed = 0.05f;
+                    totalVx += nx * retractSpeed;
+                    totalVy += ny * retractSpeed;
+                    totalVz += nz * retractSpeed;
+
+                    // Dampening swing more since holding space fuckin launches ya
+    //                 float maxSwingHeight = 0.22f;
+    //                 if (totalVy > maxSwingHeight)
+    //                 {
+    //                     totalVy = maxSwingHeight;
+    //                 }
+                }
+
+                // 4. Extract the orbital physics back out to separate it from WASD movement
+                camera.velocity.x = totalVx - moveX;
+                camera.velocity.y = totalVy;
+                camera.velocity.z = totalVz - moveZ;
+            }
+            else
+            {
+                // Air friction: If we aren't grappling, slowly decay existing orbital momentum
+                camera.velocity.x *= 0.95f;
+                camera.velocity.z *= 0.95f;
+
+                // Recalculating the totals using the decayed momentum
+                totalVx = moveX + camera.velocity.x;
+                totalVz = moveZ + camera.velocity.z;
+            }
+
+            // ----------------------------------------------------
+
+            // Apply everything to the final velocity vector
+            vuron::Vector3 vel = {totalVx, camera.velocity.y, totalVz};
+            float currentHeight = camera.isCrouched ? 1.5f : 2.0f;
+            camera.isGrounded = false;
+
+            // -- Flat Geometry Pass (X & Z)
+
+            // X-Axis
+            camera.position.x += vel.x;
+            vuron::AABB xBox = camera.getHitbox();
+            xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
+            const std::vector<int>& xCandidates = m_grid.query(xBox);
+            for (int i : xCandidates)
+            {
+                if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox())) {
+                    camera.position.x -= vel.x; vel.x = 0.0f;
+                    m_isParryLaunching = false; // Cancel Shake
+                    break;
+                }
+            }
+
+            // Z-Axis
+            camera.position.z += vel.z;
+            vuron::AABB zBox = camera.getHitbox();
+            zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
+            const std::vector<int>& zCandidates = m_grid.query(zBox);
+            for (int i : zCandidates)
+            {
+                if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox())) {
+                    camera.position.z -= vel.z; vel.z = 0.0f;
+                    m_isParryLaunching = false; // Cancel Shake
+                    break;
+                }
+            }
+
+            // -- Y-Axis Pass (Gravity & Floors) --
+            int ySteps = std::max(1, (int)std::ceil(std::abs(vel.y) / 0.25f));
+            float stepY = vel.y / ySteps;
+
+            for (int s = 0; s < ySteps; ++s)
+            {
+                camera.position.y += stepY;
+                const std::vector<int>& yCandidates = m_grid.query(camera.getHitbox());
+
+                for (int i : yCandidates)
+                {
+                    if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
+                    {
+                        if (vel.y < 0.0f) // Floor
                         {
+                            camera.position.y = m_cubes[i].getHitbox().max.y + currentHeight + 0.001f;
                             camera.isGrounded = true;
-                            camera.crouchedMidAir = false;
                             camera.currentAirGrapples = camera.maxAirGrapples;
-                            vel.x *= 0.5f; vel.z *=0.5f; // Friction
+                            camera.crouchedMidAir = false;
+
+                            m_isParryLaunching = false; // Cancel Shake
+
+                            camera.velocity.x *= 0.5f;
+                            camera.velocity.z *= 0.5f;
+                        }
+                        else if (vel.y > 0.0f) // Ceiling
+                        {
+                            camera.position.y = m_cubes[i].getHitbox().min.y - 0.201f;
+                            m_isParryLaunching = false; // Cancel Shake
+                        }
+                        vel.y = 0.0f;
+                        stepY = 0.0f;
+                        break;
+                    }
+                }
+                if (vel.y == 0.0f) break;
+            }
+
+            // -- Convex Hull Wedge Pass --
+            // 1. Getting the base hitbox
+            vuron::AABB pBox = camera.getHitbox();
+
+            // 2. Anti-phasing: Stretch hitbox to prevent clipping
+            if (vel.y < 0.0f) pBox.max.y -= vel.y;
+            else if (vel.y > 0.0f) pBox.min.y -= vel.y;
+
+            // 3. Broad phase: Query the grid using the stretched hitbox
+            const std::vector<int>& wedgeCandidates = m_grid.query(pBox);
+
+            // 4. Narrow phase: SAT math
+            for (int i : wedgeCandidates)
+            {
+                if (m_cubes[i].type == vuron::ShapeType::WEDGE || m_cubes[i].type == vuron::ShapeType::CUSTOM)
+                {
+
+                    // Broad phase: Are we inside the AABB? (red box)
+                    if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
+                    {
+                        // Dynamically load the planes depending on the shape type
+                        std::vector<vuron::Transform::Plane> planes;
+                        if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                        {
+                            vuron::Transform::Plane wPlanes[5];
+                            m_cubes[i].getWedgePlanes(wPlanes);
+                            for (int p = 0; p < 5; p++) planes.push_back(wPlanes[p]);
+                        }
+                        else
+                        {
+                            // Load the true CSG planes from TrenchBroom
+                            planes = m_cubes[i].customPlanes;
+                        }
+
+                        // Map the player's 3D hitbox
+                        vuron::Vector3 center = { (pBox.min.x + pBox.max.x)*0.5f, (pBox.min.y + pBox.max.y)*0.5f, (pBox.min.z + pBox.max.z)*0.5f };
+                        vuron::Vector3 ext = { (pBox.max.x - pBox.min.x)*0.5f, (pBox.max.y - pBox.min.y)*0.5f, (pBox.max.z - pBox.min.z)*0.5f };
+
+                        float minPenetration = 9999.0f;
+                        vuron::Vector3 pushNormal = {0, 0, 0};
+                        bool colliding = true;
+
+                        // Narrow phase - SAT check against all geometric planes dynamically
+                        for (size_t p = 0; p < planes.size(); p++)
+                        {
+                            // Project the player's radius onto the plane's angle
+                            float r = ext.x * std::abs(planes[p].normal.x) +
+                                      ext.y * std::abs(planes[p].normal.y) +
+                                      ext.z * std::abs(planes[p].normal.z);
+
+                            // Distance from player center to plane
+                            float d = vuron::dot(center, planes[p].normal) - planes[p].distance;
+
+                            // If outside any plane, no collision occurs
+                            if (d > r) { colliding = false; break; }
+
+                            // Find the plane the player penetrated the least (path of least resistance)
+                            float pen = r - d;
+                            if (pen < minPenetration)
+                            {
+                                minPenetration = pen;
+                                pushNormal = planes[p].normal;
+                            }
+                        }
+
+                        if (colliding)
+                        {
+                            m_isParryLaunching = false; // Cancel screen shake
+
+                            // 1. Physically push the player out
+                            camera.position.x += pushNormal.x * minPenetration;
+                            camera.position.y += pushNormal.y * minPenetration;
+                            camera.position.z += pushNormal.z * minPenetration;
+
+                            // 2. Kill velocity moving into the wall
+                            float impact = vuron::dot(vel, pushNormal);
+                            if (impact < 0.0f)
+                            {
+                                vel.x -= pushNormal.x * impact;
+                                vel.y -= pushNormal.y * impact;
+                                vel.z -= pushNormal.z * impact;
+                            }
+
+                            // 3. if the plane we hit was flat enough to stand on
+                            if (pushNormal.y > 0.7f)
+                            {
+                                camera.isGrounded = true;
+                                camera.crouchedMidAir = false;
+                                camera.currentAirGrapples = camera.maxAirGrapples;
+                                vel.x *= 0.5f; vel.z *=0.5f; // Friction
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // =================================================
-        // -= 4. Decouple Throttle from Physics =-
-        // =================================================
-        float survivingSpeed = std::sqrt(vel.x * vel.x + vel.z * vel.z); // Y-axis strictly not here
+            // =================================================
+            // -= 4. Decouple Throttle from Physics =-
+            // =================================================
+            float survivingSpeed = std::sqrt(vel.x * vel.x + vel.z * vel.z); // Y-axis strictly not here
 
-        // If the player moved into a flat wall and was completely stopped on both axes
-        if (survivingSpeed == 0.0f && isMoving)
-        {
-            m_currentMomentum = baseSpeed;
-        }
-
-        // Otherwise, leave m_currentMomentum along. Don't let wall friction shrink the throttle.baseSpeed
-
-        camera.velocity.y = vel.y;
-
-
-        // ===================================================================
-        //  -= 5. Jump Execution (Relying purely on Geometrical physics) =-
-        // ===================================================================
-
-        // Always reset the physical key lock if the player let go of space
-        if (!m_keySpace)
-        {
-            m_hasJumped = false;
-        }
-
-        // --- Rocket Jumping ---
-        if (camera.isGrounded)
-        {
-            m_hasRocketJumped = false; // Reset the moment the feet touch the floor
-
-            if ((m_keySpace && !m_hasJumped) || m_jumpBuffer > 0)
+            // If the player moved into a flat wall and was completely stopped on both axes
+            if (survivingSpeed == 0.0f && isMoving)
             {
-                // --- Boost Boots (Long Jump) ---
-                bool isMoving = (m_activeX != 0 || m_activeZ != 0);
-                if (camera.isCrouched && isMoving)
-                {
-                    m_currentMomentum = 0.75f; // The velocity spike
-                    m_boostHangTimer = 30;     // 30 frames of hang time
-                    m_isBoosting = false;      // Ensure decay is off
-
-                }
-
-                camera.velocity.y = jumpForce;
-                m_hasJumped = true;
-                m_jumpBuffer = 0; // Consume the buffer so no double trigger
+                m_currentMomentum = baseSpeed;
             }
-        } else {
-            // -- Mid-air Logic --
-            if (m_keySpace && !m_hasJumped)
-            {
-                // The player released and presses space again in midair
-                float peakWindow = 0.08f; // How forgiving the apex timing is
-                float rocketForce = 0.75f; // 5x jump height
 
-                // Condition 1: Are they holding Crouch?
-                // Condition 2: Did they Initiate that crouch midair?
-                // Condition 3: Have they not already RJumped?
-                // Condition 4: Is their vertical velocity floating around 0.0f?
-                if (camera.isCrouched && camera.crouchedMidAir && !m_hasRocketJumped &&
-                    camera.velocity.y <= peakWindow && camera.velocity.y >= -peakWindow)
-                    {
-                        // Kaboom.
-                        camera.velocity.y = rocketForce;
-                        m_hasRocketJumped = true; // Locking RJump
-                        m_hasJumped = true;
-                    }
-                else
+            // Otherwise, leave m_currentMomentum along. Don't let wall friction shrink the throttle.baseSpeed
+
+            camera.velocity.y = vel.y;
+
+
+            // ===================================================================
+            //  -= 5. Jump Execution (Relying purely on Geometrical physics) =-
+            // ===================================================================
+
+            // Always reset the physical key lock if the player let go of space
+            if (!m_keySpace)
+            {
+                m_hasJumped = false;
+            }
+
+            // --- Rocket Jumping ---
+            if (camera.isGrounded)
+            {
+                m_hasRocketJumped = false; // Reset the moment the feet touch the floor
+
+                if ((m_keySpace && !m_hasJumped) || m_jumpBuffer > 0)
                 {
-                    // They missed the rocket jump
-                    m_jumpBuffer = 10; // 10 frames ~ 0.166s
-                    m_hasJumped = true; // Lock further midair inputs
+                    // --- Boost Boots (Long Jump) ---
+                    bool isMoving = (m_activeX != 0 || m_activeZ != 0);
+                    if (camera.isCrouched && isMoving)
+                    {
+                        m_currentMomentum = 0.75f; // The velocity spike
+                        m_boostHangTimer = 30;     // 30 frames of hang time
+                        m_isBoosting = false;      // Ensure decay is off
+
+                    }
+
+                    camera.velocity.y = jumpForce;
+                    m_hasJumped = true;
+                    m_jumpBuffer = 0; // Consume the buffer so no double trigger
+                }
+            } else {
+                // -- Mid-air Logic --
+                if (m_keySpace && !m_hasJumped)
+                {
+                    // The player released and presses space again in midair
+                    float peakWindow = 0.08f; // How forgiving the apex timing is
+                    float rocketForce = 0.75f; // 5x jump height
+
+                    // Condition 1: Are they holding Crouch?
+                    // Condition 2: Did they Initiate that crouch midair?
+                    // Condition 3: Have they not already RJumped?
+                    // Condition 4: Is their vertical velocity floating around 0.0f?
+                    if (camera.isCrouched && camera.crouchedMidAir && !m_hasRocketJumped &&
+                        camera.velocity.y <= peakWindow && camera.velocity.y >= -peakWindow)
+                        {
+                            // Kaboom.
+                            camera.velocity.y = rocketForce;
+                            m_hasRocketJumped = true; // Locking RJump
+                            m_hasJumped = true;
+                        }
+                    else
+                    {
+                        // They missed the rocket jump
+                        m_jumpBuffer = 10; // 10 frames ~ 0.166s
+                        m_hasJumped = true; // Lock further midair inputs
+                    }
                 }
             }
         }
@@ -1299,6 +1388,10 @@ namespace vuron {
         // b. Dynamic speed FOV (Zoom)
         float baseZoom = 1500.0f;
 
+        // Combine walking throttle with actual physics speed
+        float currentPhysicalSpeed = std::sqrt(camera.velocity.x*camera.velocity.x + camera.velocity.y*camera.velocity.y + camera.velocity.z*camera.velocity.z);
+        float effectiveSpeed = m_currentMomentum + currentPhysicalSpeed;
+
         // Widen the FOV based on momentum.
         float targetZoom = baseZoom - (m_currentMomentum * 1000.0f);
 
@@ -1312,8 +1405,32 @@ namespace vuron {
         m_currentZoom += (targetZoom - m_currentZoom) * 0.25f;
 
         // c. Apply to matrices
-        // viewmatrix now automatically applies the z-roll added in math.h
-        vuron::Matrix4x4 viewMatrix = camera.getViewMatrix();
+        // Dynamic Screen Shake
+        vuron::Vector3 renderPos = camera.position;
+        if (m_isParryLaunching)
+        {
+            float currentSpd = std::sqrt(camera.velocity.x*camera.velocity.x + camera.velocity.y*camera.velocity.y + camera.velocity.z*camera.velocity.z);
+
+            // If air friction has naturally slowed us down, turn off the shake
+            if (currentSpd < 0.5f)
+            {
+                m_isParryLaunching = false;
+            }
+            else
+            {
+                // The faster we are moving, the more the shake
+                float intensity = currentSpd * 1.0f; // Change this value for screen shake intensity
+                renderPos.x += (((rand() % 100) / 100.0f) - 0.5f) * intensity;
+                renderPos.y += (((rand() % 100) / 100.0f) - 0.5f) * intensity;
+                renderPos.z += (((rand() % 100) / 100.0f) - 0.5f) * intensity;
+            }
+        }
+
+        // Pass the shaken coords to a temp camera for the GPU, leaving physics untouched
+        vuron::Camera renderCam = camera;
+        renderCam.position = renderPos;
+        vuron::Matrix4x4 viewMatrix = renderCam.getViewMatrix();
+        // -----------------------------------
 
         // projectionMatrix now uses the interpolated m_currentZoom
         vuron::Matrix4x4 projectionMatrix = vuron::Matrix4x4::perspectiveFixed(
@@ -1495,8 +1612,228 @@ namespace vuron {
             }
         }
 
+        // ==============================================================
+        // 5.1 The Cone Parry
+        // ==============================================================
+        if (m_parryActiveFrames > 0)
+        {
+            vuron::Vector3 fwd = camera.getForwardVector();
+
+            for (int i = 0; i < MAX_ROCKETS; i++)
+            {
+                // 1. STATE CHECK: Is the entity parryable right now?
+                if (m_rockets[i].isActive && m_rockets[i].isParryable)
+                {
+                    float dx = m_rockets[i].position.x - camera.position.x;
+                    float dy = m_rockets[i].position.y - camera.position.y;
+                    float dz = m_rockets[i].position.z - camera.position.z;
+
+                    float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+                    // 2. DISTANCE CHECK: Is it in melee range? (4.0 units)
+                    if (dist < 4.0f && dist > 0.0f)
+                    {
+                        float nx = dx / dist;
+                        float ny = dy / dist;
+                        float nz = dz / dist;
+
+                        // 3. ANGLE CHECK (Dot Product): Are you actually looking at it?
+                        // 1.0 = dead center of screen. 0.7 = roughly a 90-degree cone of vision.
+                        float alignment = (nx * fwd.x) + (ny * fwd.y) + (nz * fwd.z);
+
+                        if (alignment > 0.7f)
+                        {
+                            // --- PARRY SUCCESS! ---
+                            m_rockets[i].isActive = false;      // Consume the projectile
+                            m_parryActiveFrames = 0;            // End the parry window
+
+                            // Check the specific combo requirement: Did it rebound?
+                            if (m_rockets[i].bounceCount > 0)
+                            {
+                                // THE INSANE BOOST
+                                float parryPower = 1.5f;
+
+                                // Push the player in the exact opposite direction of the explosion (-nx, -ny, -nz)
+                                camera.velocity.x = -nx * parryPower;
+                                camera.velocity.y = -ny * parryPower;
+                                camera.velocity.z = -nz * parryPower;
+
+                                camera.isGrounded = false;
+                                camera.position.y += 0.2f;
+
+                                // Hitstop & Screen shake
+                                m_hitstopTimer = 8; // Exactly 8 frames 0.06s
+                                m_isParryLaunching = true;
+                            }
+                            else
+                            {
+                                // The player parried it BEFORE it bounced
+                                // Rocket is consumed (no free pogo jumping!)
+                            }
+
+                            break; // Stop checking after one successful parry
+                        }
+                    }
+                }
+            }
+        }
+
+        // ================================================
+        // 5.25 Draw Live Rockets
+        // ================================================
+        // Rebinding the master buffer
+        [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
+
+        for (int i = 0; i < MAX_ROCKETS; i++)
+        {
+            if (m_rockets[i].isActive && m_hitstopTimer == 0)
+            {
+                // 1. Calculate direction and speed
+                float speed = std::sqrt(m_rockets[i].velocity.x * m_rockets[i].velocity.x +
+                                        m_rockets[i].velocity.y * m_rockets[i].velocity.y +
+                                        m_rockets[i].velocity.z * m_rockets[i].velocity.z);
+
+                vuron::Vector3 dir = { m_rockets[i].velocity.x / speed, m_rockets[i].velocity.y / speed, m_rockets[i].velocity.z / speed };
+                vuron::Ray rRay = { m_rockets[i].position, dir };
+
+                // Max distance is how far it travels this single frame
+                float closestHit = speed;
+                int hitTarget = -1;
+                vuron::Vector3 hitNormal = {0.0f, 1.0f, 0.0f};
+
+                // 2. Scan the world for impacts
+                for (size_t j = 0; j < m_cubes.size(); ++j)
+                {
+                    float d = rRay.intersectsOBB(m_cubes[j]);
+
+                    // If we hit something closer than our max speed distance
+                    if (d > 0.0f && d < closestHit)
+                    {
+                        closestHit = d;
+                        hitTarget = (int)j;
+
+                        // Calculate exact impact coordinate
+                        vuron::Vector3 pt = {
+                            rRay.origin.x + rRay.direction.x * d,
+                            rRay.origin.y + rRay.direction.y * d,
+                            rRay.origin.z + rRay.direction.z * d
+                        };
+
+                        // Extract the surface normal for the bounce math
+                        if (m_cubes[j].type == vuron::ShapeType::CUBE)
+                        {
+                            // Because cubes are perfectly axis-aligned, just find the face that's hit
+                            vuron::Vector3 ext = { m_cubes[j].scale.x * 0.5f, m_cubes[j].scale.y * 0.5f, m_cubes[j].scale.z * 0.5f };
+                            vuron::Vector3 localPt = { pt.x - m_cubes[j].position.x, pt.y - m_cubes[j].position.y, pt.z - m_cubes[j].position.z };
+
+                            float nx = std::abs(localPt.x / ext.x);
+                            float ny = std::abs(localPt.y / ext.y);
+                            float nz = std::abs(localPt.z / ext.z);
+
+                            if (nx > ny && nx > nz) hitNormal = { (localPt.x > 0 ? 1.0f : -1.0f), 0.0f, 0.0f };
+                            else if (ny > nx && ny > nz) hitNormal = { 0.0f, (localPt.y > 0 ? 1.0f : -1.0f), 0.0f };
+                            else hitNormal = { 0.0f, 0.0f, (localPt.z > 0 ? 1.0f : -1.0f) };
+                        }
+                        else if (m_cubes[j].type == vuron::ShapeType::CUSTOM)
+                        {
+                            // Search the custom geometry planes for the one we just struck
+                            for (const auto& plane : m_cubes[j].customPlanes) {
+                                if (std::abs(vuron::dot(pt, plane.normal) - plane.distance) < 0.05f) {
+                                    hitNormal = plane.normal;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Process the Collision
+                if (hitTarget != -1)
+                {
+                    // Snap the rocket exactly to the wall
+                    m_rockets[i].position.x += rRay.direction.x * closestHit;
+                    m_rockets[i].position.y += rRay.direction.y * closestHit;
+                    m_rockets[i].position.z += rRay.direction.z * closestHit;
+
+                    m_rockets[i].bounceCount++;
+
+                    if (m_rockets[i].bounceCount >= 2)
+                    {
+                        // --- KABOOM ---
+                        m_rockets[i].isActive = false; // Destroy the rocket
+
+                        // Calculate explosion distance
+                        float dx = camera.position.x - m_rockets[i].position.x;
+                        float dy = camera.position.y - m_rockets[i].position.y;
+                        float dz = camera.position.z - m_rockets[i].position.z;
+                        float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+                        float explosionRadius = 10.0f; // Standard Rocket Jump Radius
+
+                        if (dist < explosionRadius && dist > 0.0f)
+                        {
+                            // 1.0 at epicenter, tapering to 0.0 at the outer edge
+                            float blastForce = (explosionRadius - dist) / explosionRadius;
+                            float knockbackPower = 0.6f;
+
+                            // Inject kinetic energy directly into the player
+                            camera.velocity.x += (dx / dist) * blastForce * knockbackPower;
+                            camera.velocity.y += (dy / dist) * blastForce * knockbackPower;
+                            camera.velocity.z += (dz / dist) * blastForce * knockbackPower;
+
+                            // Automatically un-ground the player so friction doesn't eat the blast
+                            if (camera.isGrounded && camera.velocity.y > 0.0f) {
+                                camera.isGrounded = false;
+                                camera.position.y += 0.1f;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // --- RICOCHET (Vector Reflection) ---
+                        float dotProd = vuron::dot(m_rockets[i].velocity, hitNormal);
+                        m_rockets[i].velocity.x -= 2.0f * dotProd * hitNormal.x;
+                        m_rockets[i].velocity.y -= 2.0f * dotProd * hitNormal.y;
+                        m_rockets[i].velocity.z -= 2.0f * dotProd * hitNormal.z;
+
+                        // Nudge it slightly off the wall so it doesn't get trapped inside
+                        m_rockets[i].position.x += hitNormal.x * 0.1f;
+                        m_rockets[i].position.y += hitNormal.y * 0.1f;
+                        m_rockets[i].position.z += hitNormal.z * 0.1f;
+                    }
+                }
+                else
+                {
+                    // No collision: Coast through the air
+                    m_rockets[i].position.x += m_rockets[i].velocity.x;
+                    m_rockets[i].position.y += m_rockets[i].velocity.y;
+                    m_rockets[i].position.z += m_rockets[i].velocity.z;
+                }
+
+                // Despawn safety net (if you shoot it into the void)
+                if (m_rockets[i].position.y < -1000.0f) m_rockets[i].isActive = false;
+
+                // 4. Draw the Rocket
+                if (m_rockets[i].isActive)
+                {
+                    vuron::Matrix4x4 rModel = vuron::Matrix4x4::scale(0.2f, 0.2f, 0.2f) *
+                                              vuron::Matrix4x4::translation(m_rockets[i].position.x, m_rockets[i].position.y, m_rockets[i].position.z);
+
+                    vuron::Matrix4x4 rMVP = rModel * viewProj;
+                    [encoder setVertexBytes:&rMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
+                    [encoder setVertexBytes:&rModel length:sizeof(vuron::Matrix4x4) atIndex:3];
+
+                    [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                        indexCount:36
+                                        indexType:MTLIndexTypeUInt16
+                                        indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                                        indexBufferOffset:0];
+                }
+            }
+        }
+
         // ===========================================
-        // 4.5 Draw Bounding box Wireframe
+        // 5.5 Draw Bounding box Wireframe
         // ===========================================
         if (m_showBoundingBoxes)
         {
@@ -1613,38 +1950,64 @@ namespace vuron {
         }
 
         // =======================================
-        // --- Draw the UI (Crosshair) ---
+        // --- Draw the UI (Crosshair & Bars) ---
         // =======================================
 
+        // 0.5. Necessary commands
         // Rebind the master buffer so no junk memory
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
-
-        // 1. Switch the GPU to the Inversion pipeline
+        // Switch the GPU to the Inversion pipeline
         [encoder setRenderPipelineState:(id<MTLRenderPipelineState>)m_uiPipelineState];
-
-        // 1.5. Apply UI Depth State
+        // Apply UI Depth State
         [encoder setDepthStencilState:g_uiDepthState];
-
-        // 2. Set the alphaFlag > 1.5 to trigger the crosshair carving-out
+        // Set the alphaFlag > 1.5 to trigger the crosshair carving-out
         float uiAlpha = 2.0f;
         [encoder setFragmentBytes:&uiAlpha length:sizeof(float) atIndex:2];
-
-        // 3. The single number to change crosshair size
-        float crosshairScale = 0.04f;
-
-        // 4. The aspect ratio fix
+        // The aspect ratio fix
         float aspectSquish = 16.0f / 9.0f;
 
-        //We only scale. No translations, no camera matrices. It thus stays perfectly centered (hypothetically)
-        vuron::Matrix4x4 uiMVP = vuron::Matrix4x4::scale(crosshairScale / aspectSquish, crosshairScale, 1.0f);
-        [encoder setVertexBytes:&uiMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
-
-        // 5. Draw it. Offset exactly 132 bytes (66 indices * 2 bytes each)
+        // 1. Drawing the crosshair
+        // The single number to change crosshair size
+        float crosshairScale = 0.04f;
+        vuron::Matrix4x4 crosshairMVP = vuron::Matrix4x4::scale(crosshairScale / aspectSquish, crosshairScale, 1.0f);
+        // If rocket launcher is equipped, make the crosshair slightly larger
+        if (m_currentWeapon == Weapon::ROCKET)
+        {
+            crosshairMVP = vuron::Matrix4x4::scale((crosshairScale * 1.5f) / aspectSquish, crosshairScale * 1.5f, 1.0f);
+        }
+        [encoder setVertexBytes:&crosshairMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
+        // Draw it. Offset exactly 132 bytes (66 indices * 2 bytes each)
         [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                             indexCount:6
                             indexType:MTLIndexTypeUInt16
                             indexBuffer:(id<MTLBuffer>)m_indexBuffer
                             indexBufferOffset:132];
+
+
+        // 2. Draw the weapon-swap loading bar
+        if (m_keyG && m_swapHoldTimer > SWAP_UI_DELAY && !m_weaponJustSwapped)
+        {
+            // Calculate progress from 0.0 to 1.0
+            float progress = (float)(m_swapHoldTimer - SWAP_UI_DELAY) / (float)(SWAP_COMPLETE - SWAP_UI_DELAY);
+
+            // Size of the bar
+            float maxBarWidth = 0.2f;
+            float currentWidth = maxBarWidth * progress;
+            float barThickness = 0.015f;
+
+            // Stretch the square to the current progress width, and push it to the bottom of the screen (y = -0.8)
+            vuron::Matrix4x4 barScale = vuron::Matrix4x4::scale(currentWidth, barThickness, 1.0f);
+            vuron::Matrix4x4 barTranslate = vuron::Matrix4x4::translation(0.0f, -0.8f, 0.0f);
+            vuron::Matrix4x4 barMVP = barScale * barTranslate;
+
+            [encoder setVertexBytes:&barMVP length:sizeof(vuron::Matrix4x4) atIndex:1];
+            // Draw again.
+            [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                indexCount:6
+                                indexType:MTLIndexTypeUInt16
+                                indexBuffer:(id<MTLBuffer>)m_indexBuffer
+                                indexBufferOffset:132];
+        }
 
         // ===========================================
         // -= 6. Debug Menu =-
@@ -1656,7 +2019,9 @@ namespace vuron {
         float px = camera.position.x;
         float py = camera.position.y;
         float pz = camera.position.z;
-        float currentSpeed = std::sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
+        float currentSpeed = std::sqrt(camera.velocity.x*camera.velocity.x +
+                                       camera.velocity.y*camera.velocity.y +
+                                       camera.velocity.z*camera.velocity.z);
         bool isAccel = m_isAccelerating;
         int renderCount = renderedObjectCount;
         int totalCount = (int)m_cubes.size();

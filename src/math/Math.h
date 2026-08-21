@@ -273,6 +273,9 @@ namespace vuron
         CUSTOM
     };
 
+    // Weapon State
+    enum class Weapon { GRAPPLE, ROCKET };
+
     // A 3D transform that holds position, rotation and scale for any entity
     struct Transform
     {
@@ -616,6 +619,16 @@ namespace vuron
             // Applying rolls last to ensure tilt happens relative to the screen
             return t * ry * rx * rz;
         }
+    };
+
+    // High-speed projectile
+    struct Rocket
+    {
+        Vector3 position = {0.0f, 0.0f, 0.0f};
+        Vector3 velocity = {0.0f, 0.0f, 0.0f};
+        bool isActive = false;
+        int bounceCount = 0;
+        bool isParryable = true;
     };
 }
 

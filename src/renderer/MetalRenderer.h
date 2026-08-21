@@ -34,8 +34,9 @@ namespace vuron
         // Debug menu toggle
         void toggleDebugMenu() { m_showDebugMenu = !m_showDebugMenu; }
 
-        // For the grappling hook
+        // For the "Guns"
         void setMouseState(bool isPressed);
+        void setRightMouseState(bool isPressed);
 
         // For Hitbox Debugging
         void toggleBoundingBoxes() { m_showBoundingBoxes = !m_showBoundingBoxes; }
@@ -104,9 +105,34 @@ namespace vuron
         bool m_isBoosting = false;
         int m_jumpBuffer = 0;
 
-        // Grappling hook trackers (for the time being)
+        // Mouse trackers
         bool m_mouseLeftDown = false;
         bool m_mouseJustClicked = false;
+        bool m_mouseRightDown = false;
+        bool m_mouseRightJustClicked = false;
+
+        // Weapon State
+        vuron::Weapon m_currentWeapon = Weapon::GRAPPLE;
+        int m_parryActiveFrames = 0;
+
+        // Swap Timers
+        bool m_keyG = false;
+        int m_swapHoldTimer = 0;
+        // Preventing rapid-fire swapping
+        bool m_weaponJustSwapped = false;
+
+        // Tweaking variables (Assuming 60fps: 6 frames = 0.1s)
+        const int SWAP_UI_DELAY = 8;
+        const int SWAP_COMPLETE = 40;
+
+        // --- Projectile System ---
+        static const int MAX_ROCKETS = 10;
+        vuron::Rocket m_rockets[MAX_ROCKETS];
+        int m_nextRocketIndex = 0;
+
+        // --- Game-Feel ---
+        int m_hitstopTimer = 0;
+        bool m_isParryLaunching = false;
 
         // Hitbox debugging
         bool m_showBoundingBoxes = false;

@@ -142,6 +142,7 @@ namespace vuron
             if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', true); handled = true;}
             if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', true); handled = true;}
             if ([chars isEqualToString:@"r"]) {m_renderer->setKeyState('r', true); handled = true;}
+            if ([chars isEqualToString:@"g"]) {m_renderer->setKeyState('g', true); handled = true;}
 
             NSString *unmodifiedChars = [[event charactersIgnoringModifiers] lowercaseString];
             // Debug menu toggle (ctrl + v)
@@ -157,10 +158,15 @@ namespace vuron
                 handled = true;
             }
         }
-        // Raw Mouse Left click pressed : Grappling hook fired (for now)
+        // Raw Mouse Left click pressed : Selected "Gun" fired
         else if (event.type == NSEventTypeLeftMouseDown)
         {
             m_renderer->setMouseState(true); // Left button pressed
+            handled = true;
+        }
+        else if (event.type == NSEventTypeRightMouseDown)
+        {
+            m_renderer->setRightMouseState(true); // Right button pressed
             handled = true;
         }
         // When the key is released, stop movement instantly
@@ -173,12 +179,20 @@ namespace vuron
             if ([chars isEqualToString:@"d"]) {m_renderer->setKeyState('d', false); handled = true;}
             if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', false); handled = true;}
             if ([chars isEqualToString:@"r"]) {m_renderer->setKeyState('r', false); handled = true;}
+            if ([chars isEqualToString:@"g"]) {m_renderer->setKeyState('g', false); handled = true;}
         }
 
         // Raw Left Mouse Up; detach grapple
         else if(event.type == NSEventTypeLeftMouseUp)
         {
             m_renderer->setMouseState(false); // Left click released
+            handled = true;
+        }
+
+        // Raw Right Mouse Up
+        else if(event.type == NSEventTypeRightMouseUp)
+        {
+            m_renderer->setRightMouseState(false); // Right click released
             handled = true;
         }
 
