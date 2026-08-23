@@ -5,8 +5,18 @@
 ## 1. What is Vuron?
 
 Vuron is a custom-built, high-performance 3D game engine and renderer developed entirely from scratch. It does not rely on commercial engines like Unity or Unreal. It is a native macOS application interfacing directly with the GPU hardware.
+
 **The Game Type:** Vuron is being developed as a hyper-kinetic, momentum-based "Free Movement Shooter" / fast-paced sandbox platformer.
+
 **The Goal:** To build a flawless, ultra-fast 3D playground where player movement is unrestrictive, geometry is mathematically solid, and the visual feedback is immediate. The goal is to achieve total mastery over low-level engine architecture (for/by myself, since this is all developed entirely myself).
+
+
+
+https://github.com/user-attachments/assets/7e8c8a94-fd86-46bf-823a-526c1b02fe82
+
+
+
+---
 
 ## 2. Technical Info
 
@@ -15,6 +25,8 @@ Vuron is a custom-built, high-performance 3D game engine and renderer developed 
 * **Coordinate System:** Left-handed (Z pushes into the screen), mapping depth from 0.0 to 1.0.
 * **Compile Environment:** Terminal via CMake / Make / Clang.
 
+---
+
 ## 3. The "Pure Path" Philosophy
 
 Vuron is developed using a philosophy called the **"Pure Path."**
@@ -22,6 +34,8 @@ Vuron is developed using a philosophy called the **"Pure Path."**
 * **Zero Bloat:** No massive libraries, no hacky `if` statements to patch edge cases. If a bug occurs (like clipping through a ramp), I ain't gonna write just a "patch"; I'll redesign the underlying mathematics to eliminate the edge case entirely.
 * **Mathematical Roots:** Every problem is aimed to be solved at its geometric root. Algebraic truths (like Planes and Vectors) are favored over brute-force CPU loops.
 * **Lean Architecture:** Data is passed to the GPU in the smallest footprints possible(by me). Vuron favors clever GPU-side math over bloated arrays, that type of stuff.
+
+---
 
 ## 4. Inspirations
 
@@ -36,32 +50,83 @@ Vuron is developed using a philosophy called the **"Pure Path."**
 * `src/platform/mac/MacWindow.mm`: Handles the native macOS window creation and OS bridging.
 * `src/renderer/MetalRenderer.h` & `.mm`: The absolute core of the engine. Contains the main rendering loop, input polling (bypassing standard OS keyboard delays), physics integration, geometry construction, and GPU command encoding.
 * `src/renderer/Shaders.metal`: The GPU programs (Vertex and Fragment shaders) compiled at runtime. Handles all visual output, UI, and lighting.
-* `src/math/Math.h`: The custom mathematics library. Contains strictly typed definitions for `Vector3`, `Matrix4x4`, `Frustum`, `AABB`, `Plane`, `Transform`, `Ray`, and `Camera`.
+* `src/math/Math.h`: The custom mathematics library. Contains strictly typed definitions for `Vector3`, `Matrix4x4`, `Frustum`, `AABB`, `Plane`, `Transform`, `Ray`, `Camera`, and `Rocket`.
 * `src/levels/test_arena.vlvl`: A custom level format loaded via `src/world/LevelLoader.h`.
 
 ---
 
-## 6. The Physics Engine & Movement Sandbox
+## 6. Controls, Mechanics & The Movement Sandbox
 
-Vuron features a highly complex, momentum-based state machine that calculates physics using rigid 3D vectors.
+Vuron is designed for high-skill ceiling movement, featuring a highly complex, momentum-based state machine that calculates physics using rigid 3D vectors. Understanding the engine's physics states is key to mastering the sandbox. And also I love fighting games so some of these are combos :) 
 
-### Core Movement Mechanics
+### General Controls & HUD
+* **WASD:** Move (stop pressing all for instant 0 momentum)
+* **Spacebar:** Jump (Hold for slow falling)
+* **Shift:** Crouch (Hold for fast falling)
+* **"R"/Double tap on WASD:** Run (toggle acceleration on/off)
+* **Left Click:** Fire Weapon / Shoot Grapple Hook
+* **Right Click:** Melee Parry
+* **Hold 'G':** Swap Weapon (Fills a visual UI loading bar to prevent accidental swaps).
+* **Crosshair States:** Small crosshair indicates Grapple Hook is active; Large crosshair indicates Rocket Launcher is armed.
+* **Debug Menu:** Toggle the debug overlay on/off with 'ctrl + v' to track precise velocity (using a true units-per-frame positional delta), coordinates, and active engine states.
+* **Bounding Boxes:** Toggle the Bounding boxes for every object with 'ctrl + b' to visually indicate the hitboxes of every object.
+* **Quitting:** Cmd + Q
 
+
+https://github.com/user-attachments/assets/cc6a2401-e7f4-437d-bce2-40f5f103b153
+
+<img width="463" height="346" alt="Screenshot 2026-08-23 at 9 33 50 PM" src="https://github.com/user-attachments/assets/5750ec1f-1612-4835-bf36-a863768cf731" />
+
+<img width="1267" height="709" alt="Screenshot 2026-08-23 at 9 33 57 PM" src="https://github.com/user-attachments/assets/f0d13cc5-b4cf-4a53-bbd7-62610e88c480" />
+
+
+### Core & Advanced Movement
 * **Wavedashing:** A frame-perfect combo system. Crouching while carrying momentum on the ground grants a burst of speed (`m_currentMomentum += 0.05f`), softly capped at 0.5f. Includes a 15-frame input buffer.
-* **Rocket Jumping:** A strict mid-air explosive jump. Only triggers if the player initiates a crouch mid-air and presses jump exactly near the apex of their vertical velocity (`y <= 0.08f && y >= -0.08f`), launching them with 3x normal force.
+
+
+https://github.com/user-attachments/assets/da16a4e2-888e-41f7-b72e-bd55f29e08f0
+
+
 * **Boost Boots (Long Jump):** Crouching and moving on the ground triggers a 30-frame "hang time" where jump decay is paused, granting massive horizontal distance, but then brutally slicing the player's speed to 0.35f, unless accelerating.
 * **Air Acceleration & Friction:** Preserves X/Z momentum independently of Y gravity. Floating gravity vs. Fast-fall gravity depends on jump input state.
 
-### The Grappling Hook (True 3D Pendulum Physics)
 
+https://github.com/user-attachments/assets/e9213999-7847-46e5-8b0c-a6d75113563f
+
+
+
+* **Rocket Boots (High Jump):** Jumping and timing a "crouch" followed by another "jump" shortly after causes the player to launch upwards with a massive burst of speed. this effectively carries the player to higher reaches, and can be combined with speed to cover great distances.
+
+
+https://github.com/user-attachments/assets/bb9ead44-1588-49ef-92b6-efe52c23ac09
+
+
+
+### The Grappling Hook (True 3D Pendulum Physics)
 * Utilizes advanced orbital mechanics, not simple linear pulling.
 * Calculates 3D tension by projecting velocity away from the anchor point and neutralizing it.
 * Uses a radius-based dampening system (friction increases heavily as the player nears the exact anchor point to prevent infinite orbital energy).
 * Features an auto-retract speed and consumes mid-air charges (`m_currentAirGrapples`) that restock upon touching flat ground or sloped surfaces.
 
+
+https://github.com/user-attachments/assets/d514108f-ec6c-4e85-8bf4-f5bc4715a2a2
+
+
+
+### The Arsenal, Projectiles & Parrying
+* **Zero-Allocation Rockets:** Projectiles are managed via a strict Ring Buffer (max capacity 5), eliminating memory allocation lag during firefights. Features a TF2-style auto-reload system (1 rocket per second after a firing delay). 
+* **Continuous Collision Detection (CCD):** Rockets calculate exact surface normals upon impact via hitscan math to execute perfect Vector Reflection ricochets on both flat and custom wedge geometry. 
+* **Rocket Jumping:** Look straight down (the engine allows a mathematically perfect 90º/1.5707f pitch without Gimbal Lock). Jump and parry(how? Read ahead!) a rocket simultaneously at the floor to launch yourself with 3x normal explosive force.
+* **The Ricochet Parry Boost:** Fire a rocket at a wall. As it ricochets and travels back into your melee range, aim directly at it and Right-Click (utilizes a Dot-Product View Cone). A successful parry consumes the rocket, freezes time for a fraction of a second, shakes the screen, and violently blasts you in the opposite direction at hyper-speed.
+
+
+https://github.com/user-attachments/assets/9981b251-a1ec-4b99-9cdc-9d19e69b3382
+
+
+
 ---
 
-## 7. Mathematical Algorithms & Collision Architecture
+## 8. Mathematical Algorithms & Collision Architecture
 
 ### Convex Hull Architecture
 
@@ -85,7 +150,7 @@ Vuron features a highly complex, momentum-based state machine that calculates ph
 
 ---
 
-## 8. The Rendering & Lighting System
+## 9. The Rendering & Lighting System
 
 ### Ultrakill Flat-Shading (Hardware Cross-Derivatives)
 
