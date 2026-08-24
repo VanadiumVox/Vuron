@@ -111,6 +111,9 @@ namespace vuron
         bool m_mouseRightDown = false;
         bool m_mouseRightJustClicked = false;
 
+        // Debug Trackers
+        vuron::Vector3 m_lastFramePosition = {0.0f, 0.0f, 0.0f};
+
         // Weapon State
         vuron::Weapon m_currentWeapon = Weapon::GRAPPLE;
         int m_parryActiveFrames = 0;

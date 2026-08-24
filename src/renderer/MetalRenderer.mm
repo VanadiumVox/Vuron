@@ -2019,9 +2019,12 @@ namespace vuron {
         float px = camera.position.x;
         float py = camera.position.y;
         float pz = camera.position.z;
-        float currentSpeed = std::sqrt(camera.velocity.x*camera.velocity.x +
-                                       camera.velocity.y*camera.velocity.y +
-                                       camera.velocity.z*camera.velocity.z);
+        float dx = px - m_lastFramePosition.x;
+        float dy = py - m_lastFramePosition.y;
+        float dz = pz - m_lastFramePosition.z;
+        float currentSpeed = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+        m_lastFramePosition = camera.position;
         bool isAccel = m_isAccelerating;
         int renderCount = renderedObjectCount;
         int totalCount = (int)m_cubes.size();
