@@ -9,6 +9,9 @@
 #include "../math/Math.h"
 #include "../world/LevelLoader.h"
 #include "../world/MapParser.h"
+// For png loading
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 namespace vuron {
     // Constructor & destructor
@@ -184,6 +187,51 @@ namespace vuron {
 
     }
 
+    void MetalRenderer::loadTexture(const std::string& filepath, const std::string& textureName)
+    {
+        int width, height, channels;
+
+        // stbi_load is what grabs the file. the '4' is forcing it into RGBA format
+        unsigned char* data = stbi_load(filepath.c_str(), &width, &height, &channels, 4);
+
+        if (!data)
+        {
+            printf("Failed to load texture: %s\n", filepath.c_str());
+            printf("STB Image Error: %s\n", stbi_failure_reason());
+            return;
+        }
+
+        // Tell Apple Metal the exact dimensions and pixel format of our image
+        MTLTextureDescriptor *textureDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                                  width:width
+                                                                  height:height
+                                                                  mipmapped:NO];
+
+        textureDesc.usage = MTLTextureUsageShaderRead;
+
+        id<MTLDevice> device = (id<MTLDevice>)m_device;
+        id<MTLTexture> metalTexture = [device newTextureWithDescriptor:textureDesc];
+
+        // We only need the shader to read, not write to this
+        MTLRegion region = {
+            {0, 0, 0},
+            {(NSUInteger)width, (NSUInteger)height, 1}
+        };
+
+        // Send the bytes from CPU RAM to GPU VRAM
+        [metalTexture replaceRegion:region
+                      mipmapLevel:0
+                      withBytes:data
+                      bytesPerRow:width * 4];
+
+        // Free CPU ram immediately. The Gpu is handling it now
+        stbi_image_free(data);
+
+        // Lock it into the map so it's possible to look it up by name later
+        m_textureCache[textureName] = metalTexture;
+        printf("Successfully loaded texture: %s (%dx%d) into VRAM\n", textureName.c_str(), width, height);
+    }
+
     bool MetalRenderer::init(void* windowHandle) {
       if (!windowHandle) return false;
       NSWindow* window = (NSWindow*)windowHandle;
@@ -249,6 +297,22 @@ namespace vuron {
         std::cerr << "Shader compilation error (you didn't install Minecraft Shaders, did you?)" << [[error localizedDescription] UTF8String] << std::endl;
         return false;
       }
+
+      // --- Dynamic Asset path resolution ---
+      // Demo mode check
+      // texpath = Texture Path
+      NSString* texPath = [baseDir stringByAppendingPathComponent:@"src/assets/textures/test_brick2.png"];
+
+      // Dev mode fallback
+      if (![[NSFileManager defaultManager] fileExistsAtPath:texPath])
+      {
+        texPath = [baseDir stringByAppendingPathComponent:@"../src/assets/textures/test_brick2.png"];
+        texPath = [texPath stringByStandardizingPath];
+      }
+
+      // Pass the dynamically resolved path to the loader
+      loadTexture([texPath UTF8String], "test_brick");
+      // -------------------------------------
 
       // Extract our specific functions by name
       id<MTLFunction> vertexFunc = [library newFunctionWithName:@"vertexMain"];
@@ -643,7 +707,7 @@ namespace vuron {
             NSString* baseDir = [execPath stringByDeletingLastPathComponent];
 
             // Loaded Level name
-            NSString* targetFile = @"test_arena.map";
+            NSString* targetFile = @"Sandbox.map";
 
             // Primary Path (demo mode)
             NSString* levelPathNS = [[baseDir stringByAppendingPathComponent:@"src/levels/"] stringByAppendingPathComponent:targetFile];

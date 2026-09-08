@@ -23,6 +23,8 @@ namespace vuron
     {
         Vector3 position;
         Vector3 color;
+        float u;
+        float v;
     };
 
     // -- Vector Math Helpers --

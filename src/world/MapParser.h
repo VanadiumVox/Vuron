@@ -13,10 +13,23 @@
 namespace vuron
 {
 
+    struct TextureMatrix
+    {
+        char name[64];
+        vuron::Vector3 uAxis;
+        float uOffset;
+        vuron::Vector3 vAxis;
+        float vOffset;
+        float rotation;
+        float uScale;
+        float vScale;
+    };
+
     struct MapPlane
     {
         vuron::Vector3 normal;
         float distance;
+        TextureMatrix texData;
     };
 
     struct MapBrush
@@ -378,26 +391,34 @@ namespace vuron
 
             static MapPlane parsePlane(const std::string& line)
             {
-                std::string cleaned = line;
-                for (char& c : cleaned)
-                {
-                    if (c == '(' || c == ')') c = ' ';
-                }
-
-                std::istringstream iss(cleaned);
+                // 1. Temporary variables to catch the raw data from TrenchBroom
                 float p1x, p1y, p1z, p2x, p2y, p2z, p3x, p3y, p3z;
-                iss >> p1x >> p1y >> p1z >> p2x >> p2y >> p2z >> p3x >> p3y >> p3z;
+                char texName[64] = {0};
+                float ux, uy, uz, uOff;
+                float vx, vy, vz, vOff;
+                float rot, uScale, vScale;
 
+                // 2. The sscanf extraction (Replaces your old istringstream block)
+                int scanned = sscanf(line.c_str(),
+                    "( %f %f %f ) ( %f %f %f ) ( %f %f %f ) %63s [ %f %f %f %f ] [ %f %f %f %f ] %f %f %f",
+                    &p1x, &p1y, &p1z,
+                    &p2x, &p2y, &p2z,
+                    &p3x, &p3y, &p3z,
+                    texName,
+                    &ux, &uy, &uz, &uOff,
+                    &vx, &vy, &vz, &vOff,
+                    &rot, &uScale, &vScale);
+
+                // 3. Exact scaling and coordinate swizzling
                 float scale = 1.0f / 4.0f;
                 vuron::Vector3 p1 = { -p1x * scale, p1z * scale, -p1y * scale };
                 vuron::Vector3 p2 = { -p2x * scale, p2z * scale, -p2y * scale };
                 vuron::Vector3 p3 = { -p3x * scale, p3z * scale, -p3y * scale };
 
-                // Cross product of (p2 - p1) and (p3 - p1)
+                // 4. Exact cross-product and normal math
                 vuron::Vector3 v1 = { p2.x - p1.x, p2.y - p1.y, p2.z - p1.z };
                 vuron::Vector3 v2 = { p3.x - p1.x, p3.y - p1.y, p3.z - p1.z };
 
-                // Reversed cross-product (v2 x v1) to match Vuron's coordinate handedness
                 vuron::Vector3 normal =
                 {
                     (v1.y * v2.z) - (v1.z * v2.y),
@@ -411,9 +432,25 @@ namespace vuron
                     normal.x /= mag; normal.y /= mag; normal.z /= mag;
                 }
 
+                // 5. plane and distance math
                 MapPlane plane;
                 plane.normal = normal;
                 plane.distance = (normal.x * p1.x) + (normal.y * p1.y) + (normal.z * p1.z);
+
+                // 6. Save the Texture Data if TrenchBroom provided it
+                if (scanned == 21)
+                {
+                    strncpy(plane.texData.name, texName, sizeof(plane.texData.name) - 1);
+                    plane.texData.name[sizeof(plane.texData.name) - 1] = '\0';
+
+                    plane.texData.uAxis = {ux, uy, uz};
+                    plane.texData.uOffset = uOff;
+                    plane.texData.vAxis = {vx, vy, vz};
+                    plane.texData.vOffset = vOff;
+                    plane.texData.rotation = rot;
+                    plane.texData.uScale = uScale;
+                    plane.texData.vScale = vScale;
+                }
 
                 return plane;
             }

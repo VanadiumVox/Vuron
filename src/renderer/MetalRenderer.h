@@ -8,6 +8,9 @@
 #include <vector>
 #include "../math/Math.h"
 #include "../world/SpatialGrid.h"
+#include <unordered_map>
+#include <string>
+#import <Metal/Metal.h>
 
 namespace vuron
 {
@@ -142,6 +145,10 @@ namespace vuron
 
         // The Spatial grid - Manages physics state
         vuron::SpatialHashGrid m_grid;
+
+        // --- Texture Pipeline ---
+        std::unordered_map<std::string, id<MTLTexture>> m_textureCache;
+        void loadTexture(const std::string& filepath, const std::string& textureName);
 
     };
 }

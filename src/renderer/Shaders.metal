@@ -6,6 +6,7 @@ using namespace metal;
 struct VertexIn {
     packed_float3 position;
     packed_float3 color;
+    packed_float2 uv;
 };
 
 // The output structure to hand to the next bit of code
@@ -15,6 +16,7 @@ struct VertexOut {
     float3 color;
     float3 localPos;
     float3 worldPos;
+    float2 uv;
 };
 
 // The math program (runs on GPU cores)
@@ -32,6 +34,7 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
 
     out.color = in.color;
     out.localPos = float3(in.position[0], in.position[1], in.position[2]);
+    out.uv = in.uv;
 
     // Calculating 3D position for Lighting math
     out.worldPos = (modelMatrix * float4(in.position, 1.0)).xyz;
