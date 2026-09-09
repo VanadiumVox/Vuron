@@ -48,7 +48,8 @@ vertex VertexOut vertexMain(uint VertexID [[vertex_id]],
 // P.S, I'm leaving that as 'otuput' to prove that this was written by a human.
 fragment float4 fragmentMain(VertexOut in [[stage_in]],
                              constant float& alphaFlag [[buffer(2)]],
-                             constant float4& grappleLight [[buffer(3)]])
+                             constant float4& grappleLight [[buffer(3)]],
+                             texture2d<float> tex2D [[texture(0)]])
 {
 
     // --- The Crosshair Pass ---
@@ -146,8 +147,14 @@ fragment float4 fragmentMain(VertexOut in [[stage_in]],
     // Ambient + Sunlight + Orange Point Light + Blue Grapple Light (Boosted intensity by 2.5)
     float3 finalLight = ambient + (diffuse * 0.6) + (pointDiffuse * pointLightColor * 1.5) + (grappleDiffuse * grappleColor * 2.5);
 
-    // Multiply the raw color by the lighting data
-    float3 finalColor = in.color * finalLight;
+    // A hardware sampler built for the retro aesthetic
+    constexpr sampler texSampler(mag_filter::nearest, min_filter::nearest, address::repeat);
+
+    // Extract the color from the image using the Valve 220 UVs
+    float4 textureColor = tex2D.sample(texSampler, in.uv);
+
+    // Multiply the texture color by the vertex color (white) and the lighting
+    float3 finalColor = textureColor.rgb * in.color * finalLight;
 
     return float4(finalColor, 1.0);
 }

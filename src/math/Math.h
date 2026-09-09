@@ -290,7 +290,7 @@ namespace vuron
         Vector3 normal = {0.0f, 1.0f, 0.0f}; // Only used if it's a wedge
 
         // Will only be populated if type == CUSTOM
-        std::vector<vuron::Vector3> customTriangles;
+        std::vector<vuron::Vertex> customTriangles;
 
         // GPU Memory Handles for Custom geometry
         void* customVertexBuffer = nullptr;

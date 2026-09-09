@@ -202,7 +202,7 @@ namespace vuron {
         }
 
         // Tell Apple Metal the exact dimensions and pixel format of our image
-        MTLTextureDescriptor *textureDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+        MTLTextureDescriptor *textureDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
                                                                   width:width
                                                                   height:height
                                                                   mipmapped:NO];
@@ -425,56 +425,56 @@ namespace vuron {
        vuron::Vertex allVertices[] =
        {
              // --- CUBE (Vertices 0-7) ---
-             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 0: Top Left (Red)
-             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // 1: Top Right (Green)
-             {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 2: Bottom Left (Blue)
-             {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 3: Bottom Right (Yellow)
-             {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}, // 4: Top Left Back (Magenta)
-             {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 5: Top Right Back (Cyan)
-             {{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}}, // 6: Bottom Left Back (White)
-             {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 0.0f}}, // 7: Bottom Right Back (Black)
+             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f}, // 0: Top Left (Red)
+             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f}, // 1: Top Right (Green)
+             {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, 0.0f, 0.0f}, // 2: Bottom Left (Blue)
+             {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}, 0.0f, 0.0f}, // 3: Bottom Right (Yellow)
+             {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}, 0.0f, 0.0f}, // 4: Top Left Back (Magenta)
+             {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}, 0.0f, 0.0f}, // 5: Top Right Back (Cyan)
+             {{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}, 0.0f, 0.0f}, // 6: Bottom Left Back (White)
+             {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f}, // 7: Bottom Right Back (Black)
 
              // --- WEDGE (Vertices 8-13) ---
              // A Wedge tall at the front (-z) and flat at the back (+z), matching our Up/Forward normal
-             {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 8: Bottom Left Front
-             {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // 9: Bottom Right Front
-             {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // 10: Bottom Left Back (The thin tip)
-             {{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // 11: Bottom Right Back (The thin tip)
-             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}}, // 12: Top Left Front (The high wall)
-             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},  // 13: Top Right Front (The high wall)
+             {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f}, // 8: Bottom Left Front
+             {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f}, // 9: Bottom Right Front
+             {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, 0.0f, 0.0f}, // 10: Bottom Left Back (The thin tip)
+             {{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}, 0.0f, 0.0f}, // 11: Bottom Right Back (The thin tip)
+             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}, 0.0f, 0.0f}, // 12: Top Left Front (The high wall)
+             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}, 0.0f, 0.0f},  // 13: Top Right Front (The high wall)
 
              // --- Shadow Quad (Vertices 14-17) ---
-             {{-0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}},
-             {{ 0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}},
-             {{-0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}},
-             {{ 0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}},
+             {{-0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{-0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f, 0.0f,  0.5f}, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
 
              // --- CROSSHAIR QUAD (Vertices 18-21) ---
              // A flat square facing the screen (using X and Y axes)
-             {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
-             {{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
-             {{-0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
-             {{ 0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+             {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, 0.0f, 0.0f},
+             {{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, 0.0f, 0.0f},
+             {{-0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, 0.0f, 0.0f},
+             {{ 0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, 0.0f, 0.0f},
 
              // --- GREEN VISUAL BOX (Vertices 22-29) ---
-             {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-             {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-             {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-             {{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
-             {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
-             {{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
-             {{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
+             {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f},
+             {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f},
+             {{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f},
+             {{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f},
 
              // --- RED PHYSICAL BOX (Vertices 30-37) ---
-             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-             {{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-             {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-             {{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-             {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
-             {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
-             {{-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
-             {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}}
+             {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f},
+             {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f}
        };
 
        uint16_t allIndices[] =
@@ -748,13 +748,13 @@ namespace vuron {
                         {
                             vuron::Vector3 localPt =
                             {
-                                pt.x - m_cubes[i].position.x,
-                                pt.y - m_cubes[i].position.y,
-                                pt.z - m_cubes[i].position.z
+                                pt.position.x - m_cubes[i].position.x,
+                                pt.position.y - m_cubes[i].position.y,
+                                pt.position.z - m_cubes[i].position.z
                             };
 
                             // Giving custom shapes a distinct Orange color
-                            gpuVertices.push_back({localPt, {1.0f, 0.5f, 0.2f}});
+                            gpuVertices.push_back({localPt, pt.color, pt.u, pt.v});
                         }
                         m_cubes[i].customVertexCount = (int)gpuVertices.size();
 
@@ -1178,169 +1178,144 @@ namespace vuron {
 
             // ----------------------------------------------------
 
-            // Apply everything to the final velocity vector
+            // -= Continuous Collision Detection =-
             vuron::Vector3 vel = {totalVx, camera.velocity.y, totalVz};
             float currentHeight = camera.isCrouched ? 1.5f : 2.0f;
             camera.isGrounded = false;
 
-            // -- Flat Geometry Pass (X & Z)
+            // --- THE CCD MASTER LOOP ---
+            // Find the fastest axis to determine how many chunks we need
+            float maxVel = std::max({std::abs(vel.x), std::abs(vel.y), std::abs(vel.z)});
+            int steps = std::max(1, (int)std::ceil(maxVel / 0.25f));
 
-            // X-Axis
-            camera.position.x += vel.x;
-            vuron::AABB xBox = camera.getHitbox();
-            xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
-            const std::vector<int>& xCandidates = m_grid.query(xBox);
-            for (int i : xCandidates)
+            vuron::Vector3 stepVel = {vel.x / steps, vel.y / steps, vel.z / steps};
+
+            for (int s = 0; s < steps; ++s)
             {
-                if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox())) {
-                    camera.position.x -= vel.x; vel.x = 0.0f;
-                    m_isParryLaunching = false; // Cancel Shake
-                    break;
+                // -- Flat Geometry Pass (X & Z) --
+                camera.position.x += stepVel.x;
+                vuron::AABB xBox = camera.getHitbox();
+                xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
+                for (int i : m_grid.query(xBox))
+                {
+                    if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox()))
+                    {
+                        camera.position.x -= stepVel.x; stepVel.x = 0.0f; vel.x = 0.0f;
+                        m_isParryLaunching = false; // Cancel screen shaking
+                        break;
+                    }
                 }
-            }
 
-            // Z-Axis
-            camera.position.z += vel.z;
-            vuron::AABB zBox = camera.getHitbox();
-            zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
-            const std::vector<int>& zCandidates = m_grid.query(zBox);
-            for (int i : zCandidates)
-            {
-                if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox())) {
-                    camera.position.z -= vel.z; vel.z = 0.0f;
-                    m_isParryLaunching = false; // Cancel Shake
-                    break;
+                camera.position.z += stepVel.z;
+                vuron::AABB zBox = camera.getHitbox();
+                zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
+                for (int i : m_grid.query(zBox))
+                {
+                    if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox()))
+                    {
+                        camera.position.z -= stepVel.z; stepVel.z = 0.0f; vel.z = 0.0f;
+                        m_isParryLaunching = false; // Cancel screen shake
+                        break;
+                    }
                 }
-            }
 
-            // -- Y-Axis Pass (Gravity & Floors) --
-            int ySteps = std::max(1, (int)std::ceil(std::abs(vel.y) / 0.25f));
-            float stepY = vel.y / ySteps;
-
-            for (int s = 0; s < ySteps; ++s)
-            {
-                camera.position.y += stepY;
-                const std::vector<int>& yCandidates = m_grid.query(camera.getHitbox());
-
-                for (int i : yCandidates)
+                // -- Y-Axis Pass (Gravity & Floors) --
+                camera.position.y += stepVel.y;
+                for (int i : m_grid.query(camera.getHitbox()))
                 {
                     if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(camera.getHitbox(), m_cubes[i].getHitbox()))
                     {
-                        if (vel.y < 0.0f) // Floor
+                        if (stepVel.y < 0.0f) // Floor
                         {
                             camera.position.y = m_cubes[i].getHitbox().max.y + currentHeight + 0.001f;
                             camera.isGrounded = true;
                             camera.currentAirGrapples = camera.maxAirGrapples;
                             camera.crouchedMidAir = false;
+                            m_isParryLaunching = false;
 
-                            m_isParryLaunching = false; // Cancel Shake
-
-                            camera.velocity.x *= 0.5f;
-                            camera.velocity.z *= 0.5f;
+                            vel.x *= 0.5f;
+                            vel.z *= 0.5f;
+                            stepVel.x *= 0.5f;
+                            stepVel.z *= 0.5f; // Friction
                         }
-                        else if (vel.y > 0.0f) // Ceiling
+                        else if (stepVel.y > 0.0f)
                         {
                             camera.position.y = m_cubes[i].getHitbox().min.y - 0.201f;
-                            m_isParryLaunching = false; // Cancel Shake
+                            m_isParryLaunching = false;
                         }
-                        vel.y = 0.0f;
-                        stepY = 0.0f;
-                        break;
+                        stepVel.y = 0.0f; vel.y = 0.0f; break;
                     }
                 }
-                if (vel.y == 0.0f) break;
-            }
 
-            // -- Convex Hull Wedge Pass --
-            // 1. Getting the base hitbox
-            vuron::AABB pBox = camera.getHitbox();
+                // -- Convex Hull Wedge Pass (SAT) --
+                vuron::AABB pBox = camera.getHitbox();
+                if (stepVel.y < 0.0f) pBox.max.y -= stepVel.y;
+                else if (stepVel.y > 0.0f) pBox.min.y -= stepVel.y;
 
-            // 2. Anti-phasing: Stretch hitbox to prevent clipping
-            if (vel.y < 0.0f) pBox.max.y -= vel.y;
-            else if (vel.y > 0.0f) pBox.min.y -= vel.y;
-
-            // 3. Broad phase: Query the grid using the stretched hitbox
-            const std::vector<int>& wedgeCandidates = m_grid.query(pBox);
-
-            // 4. Narrow phase: SAT math
-            for (int i : wedgeCandidates)
-            {
-                if (m_cubes[i].type == vuron::ShapeType::WEDGE || m_cubes[i].type == vuron::ShapeType::CUSTOM)
+                for (int i : m_grid.query(pBox))
                 {
-
-                    // Broad phase: Are we inside the AABB? (red box)
-                    if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
+                    if (m_cubes[i].type == vuron::ShapeType::WEDGE || m_cubes[i].type == vuron::ShapeType::CUSTOM)
                     {
-                        // Dynamically load the planes depending on the shape type
-                        std::vector<vuron::Transform::Plane> planes;
-                        if (m_cubes[i].type == vuron::ShapeType::WEDGE)
+                        if (vuron::AABB::checkCollision(pBox, m_cubes[i].getHitbox()))
                         {
-                            vuron::Transform::Plane wPlanes[5];
-                            m_cubes[i].getWedgePlanes(wPlanes);
-                            for (int p = 0; p < 5; p++) planes.push_back(wPlanes[p]);
-                        }
-                        else
-                        {
-                            // Load the true CSG planes from TrenchBroom
-                            planes = m_cubes[i].customPlanes;
-                        }
 
-                        // Map the player's 3D hitbox
-                        vuron::Vector3 center = { (pBox.min.x + pBox.max.x)*0.5f, (pBox.min.y + pBox.max.y)*0.5f, (pBox.min.z + pBox.max.z)*0.5f };
-                        vuron::Vector3 ext = { (pBox.max.x - pBox.min.x)*0.5f, (pBox.max.y - pBox.min.y)*0.5f, (pBox.max.z - pBox.min.z)*0.5f };
-
-                        float minPenetration = 9999.0f;
-                        vuron::Vector3 pushNormal = {0, 0, 0};
-                        bool colliding = true;
-
-                        // Narrow phase - SAT check against all geometric planes dynamically
-                        for (size_t p = 0; p < planes.size(); p++)
-                        {
-                            // Project the player's radius onto the plane's angle
-                            float r = ext.x * std::abs(planes[p].normal.x) +
-                                      ext.y * std::abs(planes[p].normal.y) +
-                                      ext.z * std::abs(planes[p].normal.z);
-
-                            // Distance from player center to plane
-                            float d = vuron::dot(center, planes[p].normal) - planes[p].distance;
-
-                            // If outside any plane, no collision occurs
-                            if (d > r) { colliding = false; break; }
-
-                            // Find the plane the player penetrated the least (path of least resistance)
-                            float pen = r - d;
-                            if (pen < minPenetration)
+                            // Keeping the existing plane generation and minPenetration loop here & lower
+                            std::vector<vuron::Transform::Plane> planes;
+                            if (m_cubes[i].type == vuron::ShapeType::WEDGE)
                             {
-                                minPenetration = pen;
-                                pushNormal = planes[p].normal;
+                                vuron::Transform::Plane wPlanes[5];
+                                m_cubes[i].getWedgePlanes(wPlanes);
+                                for (int p = 0; p < 5; p++) planes.push_back(wPlanes[p]);
                             }
-                        }
-
-                        if (colliding)
-                        {
-                            m_isParryLaunching = false; // Cancel screen shake
-
-                            // 1. Physically push the player out
-                            camera.position.x += pushNormal.x * minPenetration;
-                            camera.position.y += pushNormal.y * minPenetration;
-                            camera.position.z += pushNormal.z * minPenetration;
-
-                            // 2. Kill velocity moving into the wall
-                            float impact = vuron::dot(vel, pushNormal);
-                            if (impact < 0.0f)
+                            else
                             {
-                                vel.x -= pushNormal.x * impact;
-                                vel.y -= pushNormal.y * impact;
-                                vel.z -= pushNormal.z * impact;
+                                planes = m_cubes[i].customPlanes;
                             }
 
-                            // 3. if the plane we hit was flat enough to stand on
-                            if (pushNormal.y > 0.7f)
+                            vuron::Vector3 center = { (pBox.min.x + pBox.max.x)*0.5f, (pBox.min.y + pBox.max.y)*0.5f, (pBox.min.z + pBox.max.z)*0.5f };
+                            vuron::Vector3 ext = { (pBox.max.x - pBox.min.x)*0.5f, (pBox.max.y - pBox.min.y)*0.5f, (pBox.max.z - pBox.min.z)*0.5f };
+
+                            float minPenetration = 9999.0f;
+                            vuron::Vector3 pushNormal = {0, 0, 0};
+                            bool colliding = true;
+
+                            for (size_t p = 0; p < planes.size(); p++)
                             {
-                                camera.isGrounded = true;
-                                camera.crouchedMidAir = false;
-                                camera.currentAirGrapples = camera.maxAirGrapples;
-                                vel.x *= 0.5f; vel.z *=0.5f; // Friction
+                                float r = ext.x * std::abs(planes[p].normal.x) + ext.y * std::abs(planes[p].normal.y) + ext.z * std::abs(planes[p].normal.z);
+                                float d = vuron::dot(center, planes[p].normal) - planes[p].distance;
+                                if (d > r)
+                                {
+                                    colliding = false;
+                                    break;
+                                }
+                                float pen = r - d;
+                                if (pen < minPenetration)
+                                {
+                                    minPenetration = pen;
+                                    pushNormal = planes[p].normal;
+                                }
+                            }
+
+                            if (colliding)
+                            {
+                                m_isParryLaunching = false; // Cancel Screen shake
+                                camera.position.x += pushNormal.x * minPenetration;
+                                camera.position.y += pushNormal.y * minPenetration;
+                                camera.position.z += pushNormal.z * minPenetration;
+
+                                // Apply impact to both step and total velocity
+                                float impact = vuron::dot(stepVel, pushNormal);
+                                if (impact < 0.0f)
+                                {
+                                    stepVel.x -= pushNormal.x * impact; stepVel.y -= pushNormal.y * impact; stepVel.z -= pushNormal.z * impact;
+                                    vel.x -= pushNormal.x * impact; vel.y -= pushNormal.y * impact; vel.z -= pushNormal.z * impact;
+                                }
+
+                                if (pushNormal.y > 0.7f)
+                                {
+                                    camera.isGrounded = true; camera.crouchedMidAir = false; camera.currentAirGrapples = camera.maxAirGrapples;
+                                    vel.x *= 0.5f; vel.z *=0.5f; stepVel.x *= 0.5f; stepVel.z *= 0.5f;
+                                }
                             }
                         }
                     }
@@ -1510,6 +1485,9 @@ namespace vuron {
         // Ensure normal geometry draws completely solid
         float solidAlpha = 1.0f;
         [encoder setFragmentBytes:&solidAlpha length:sizeof(float) atIndex:2];
+
+        // Bind the texture globally for the whole frame
+        [encoder setFragmentTexture:m_textureCache["test_brick"] atIndex:0];
 
         // =====================================================
         // --- Dynamic Grapple Light Bridge ---

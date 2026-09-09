@@ -242,12 +242,44 @@ namespace vuron
                             return angleA < angleB;
                         });
 
-                        // 5. Generate the Triangle Fan and feed it to the struct
+                        // 5. Generate the Triangle Fan and calculate UVs
+                        auto makeVertex = [&](vuron::Vector3 v) -> vuron::Vertex
+                        {
+                            vuron::Vertex outVert;
+                            outVert.position = v;
+                            // Set color to pure white so it doesn't tint the texture
+                            outVert.color = {1.0f, 1.0f, 1.0f};
+
+                            // Prevent divide-by-zero if the face had no texture data
+                            float uScale = plane.texData.uScale == 0.0f ? 1.0f : plane.texData.uScale;
+                            float vScale = plane.texData.vScale == 0.0f ? 1.0f : plane.texData.vScale;
+
+                            // Revert the Vuron vector back to raw TrenchBroom Quake space for the math
+                            // Vuron space: x = -Qx/4, y = Qz/4, z = -Qy/4
+                            // Quake space: Qx = -x*4, Qy = -z*4, Qz = y*4
+                            vuron::Vector3 quakeV = {
+                                -v.x * 4.0f,
+                                -v.z * 4.0f,
+                                 v.y * 4.0f
+                            };
+
+                            // Update these to match the exact pixel dimensions of your PNG!
+                            float texWidth = 32.0f;
+                            float texHeight = 32.0f;
+
+                            // The Pure Path: Valve 220 UV Projection Math using Quake Space
+                            outVert.u = (vuron::dot(quakeV, plane.texData.uAxis) / uScale + plane.texData.uOffset) / texWidth;
+                            outVert.v = (vuron::dot(quakeV, plane.texData.vAxis) / vScale + plane.texData.vOffset) / texHeight;
+
+                            return outVert;
+                        };
+
                         for (size_t i = 1; i < faceVerts.size() - 1; ++i)
                         {
-                            outShape.customTriangles.push_back(faceVerts[0]);
-                            outShape.customTriangles.push_back(faceVerts[i]);
-                            outShape.customTriangles.push_back(faceVerts[i+1]);
+                            outShape.customTriangles.push_back(makeVertex(faceVerts[0]));
+                            outShape.customTriangles.push_back(makeVertex(faceVerts[i]));
+                            outShape.customTriangles.push_back(makeVertex(faceVerts[i+1]));
+
                         }
                     }
                 }
@@ -311,42 +343,56 @@ namespace vuron
                     shape.rotation = { 0.0f, 0.0f, 0.0f };
 
                     // -= Strict Shape Routing =-
-                    bool isPerfectCube = false;
-                    if (numPlanes == 6)
-                    {
-                        isPerfectCube = true;
-                        for (const auto& plane : brush.planes)
-                        {
-                            // A perfect unrotated cube must face along exactly one axis
-                            float maxAxis = std::max({std::abs(plane.normal.x), std::abs(plane.normal.y), std::abs(plane.normal.z)});
-                            if (maxAxis < 0.99f)
-                            {
-                                //If it's rotated or skewed, Route to CUSTOM
-                                isPerfectCube = false;
-                                break;
-                            }
-                        }
-                    }
+//                     bool isPerfectCube = false;
+//                     if (numPlanes == 6)
+//                     {
+//                         isPerfectCube = true;
+//                         for (const auto& plane : brush.planes)
+//                         {
+//                             // A perfect unrotated cube must face along exactly one axis
+//                             float maxAxis = std::max({std::abs(plane.normal.x), std::abs(plane.normal.y), std::abs(plane.normal.z)});
+//                             if (maxAxis < 0.99f)
+//                             {
+//                                 //If it's rotated or skewed, Route to CUSTOM
+//                                 isPerfectCube = false;
+//                                 break;
+//                             }
+//                         }
+//                     }
+//
+//                     if (isPerfectCube)
+//                     {
+//                         shape.type = vuron::ShapeType::CUBE;
+//                     }
+//                     else
+//                     {
+//                         // Everything else
+//                         shape.type = vuron::ShapeType::CUSTOM;
+//                         triangulateBrush(brush, vertices, shape);
+//
+//                         // Save TrenchBroom planes directly to the physics engine
+//                         for (const auto& plane : brush.planes)
+//                         {
+//                             vuron::Transform::Plane tp;
+//                             tp.normal = plane.normal;
+//                             tp.distance = plane.distance;
+//                             shape.customPlanes.push_back(tp);
+//                         }
+//                     }
 
-                    if (isPerfectCube)
-                    {
-                        shape.type = vuron::ShapeType::CUBE;
-                    }
-                    else
-                    {
-                        // Everything else
-                        shape.type = vuron::ShapeType::CUSTOM;
-                        triangulateBrush(brush, vertices, shape);
+                     // -= Strict Shape Routing =-
+                     // Treat all Trenchbroom brushes as CUSTOM geometry to get their UVs mapped
+                     shape.type = vuron::ShapeType::CUSTOM;
+                     triangulateBrush(brush, vertices, shape);
 
-                        // Save TrenchBroom planes directly to the physics engine
-                        for (const auto& plane : brush.planes)
-                        {
-                            vuron::Transform::Plane tp;
-                            tp.normal = plane.normal;
-                            tp.distance = plane.distance;
-                            shape.customPlanes.push_back(tp);
-                        }
-                    }
+                     // Save all TrenchBroom planes directly to the physics engine
+                     for (const auto& plane : brush.planes)
+                     {
+                        vuron::Transform::Plane tp;
+                        tp.normal = plane.normal;
+                        tp.distance = plane.distance;
+                        shape.customPlanes.push_back(tp);
+                     }
 
                     shapes.push_back(shape);
                 }
@@ -433,7 +479,7 @@ namespace vuron
                 }
 
                 // 5. plane and distance math
-                MapPlane plane;
+                MapPlane plane = {};
                 plane.normal = normal;
                 plane.distance = (normal.x * p1.x) + (normal.y * p1.y) + (normal.z * p1.z);
 
