@@ -9,6 +9,7 @@
 #include <algorithm>
 #include "../math/Math.h"
 #include "LevelLoader.h"
+#include <unordered_map>
 
 namespace vuron
 {
@@ -181,7 +182,7 @@ namespace vuron
                 return true;
             }
 
-            static void triangulateBrush(const MapBrush& brush, const std::vector<vuron::Vector3>& vertices, vuron::Transform& outShape)
+            static void triangulateBrush(const MapBrush& brush, const std::vector<vuron::Vector3>& vertices, vuron::Transform& outShape, const std::unordered_map<std::string, vuron::TextureDims>& texDict)
             {
                 for (const auto& plane : brush.planes)
                 {
@@ -263,9 +264,20 @@ namespace vuron
                                  v.y * 4.0f
                             };
 
-                            // Update these to match the exact pixel dimensions of your PNG!
+                            std::string tName(plane.texData.name);
                             float texWidth = 32.0f;
                             float texHeight = 32.0f;
+
+                            // Ask the dictionary for the exact pixels
+                            if (texDict.find(tName) != texDict.end())
+                            {
+                                texWidth = texDict.at(tName).w;
+                                texHeight = texDict.at(tName).h;
+                            }
+                            else
+                            {
+                                std::cout << "[Vuron Warning] Texture dimensions missing: " << tName << std::endl;
+                            }
 
                             // The Pure Path: Valve 220 UV Projection Math using Quake Space
                             outVert.u = (vuron::dot(quakeV, plane.texData.uAxis) / uScale + plane.texData.uOffset) / texWidth;
@@ -286,7 +298,7 @@ namespace vuron
             }
 
             // --- BRUSH TO VURON SHAPE CONVERTER ---
-            static std::vector<vuron::Transform> generateShapes(const MapData& data)
+            static std::vector<vuron::Transform> generateShapes(const MapData& data, const std::unordered_map<std::string, vuron::TextureDims>& texDict)
             {
                 std::vector<vuron::Transform> shapes;
 
@@ -342,48 +354,11 @@ namespace vuron
                     shape.scale = { maxB.x - minB.x, maxB.y - minB.y, maxB.z - minB.z };
                     shape.rotation = { 0.0f, 0.0f, 0.0f };
 
-                    // -= Strict Shape Routing =-
-//                     bool isPerfectCube = false;
-//                     if (numPlanes == 6)
-//                     {
-//                         isPerfectCube = true;
-//                         for (const auto& plane : brush.planes)
-//                         {
-//                             // A perfect unrotated cube must face along exactly one axis
-//                             float maxAxis = std::max({std::abs(plane.normal.x), std::abs(plane.normal.y), std::abs(plane.normal.z)});
-//                             if (maxAxis < 0.99f)
-//                             {
-//                                 //If it's rotated or skewed, Route to CUSTOM
-//                                 isPerfectCube = false;
-//                                 break;
-//                             }
-//                         }
-//                     }
-//
-//                     if (isPerfectCube)
-//                     {
-//                         shape.type = vuron::ShapeType::CUBE;
-//                     }
-//                     else
-//                     {
-//                         // Everything else
-//                         shape.type = vuron::ShapeType::CUSTOM;
-//                         triangulateBrush(brush, vertices, shape);
-//
-//                         // Save TrenchBroom planes directly to the physics engine
-//                         for (const auto& plane : brush.planes)
-//                         {
-//                             vuron::Transform::Plane tp;
-//                             tp.normal = plane.normal;
-//                             tp.distance = plane.distance;
-//                             shape.customPlanes.push_back(tp);
-//                         }
-//                     }
-
                      // -= Strict Shape Routing =-
                      // Treat all Trenchbroom brushes as CUSTOM geometry to get their UVs mapped
                      shape.type = vuron::ShapeType::CUSTOM;
-                     triangulateBrush(brush, vertices, shape);
+                     shape.textureName = brush.planes[0].texData.name;
+                     triangulateBrush(brush, vertices, shape, texDict);
 
                      // Save all TrenchBroom planes directly to the physics engine
                      for (const auto& plane : brush.planes)

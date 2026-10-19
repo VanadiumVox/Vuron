@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <numbers>
+#include <string>
 
 namespace vuron
 {
@@ -25,6 +26,12 @@ namespace vuron
         Vector3 color;
         float u;
         float v;
+    };
+
+    struct TextureDims
+    {
+        float w;
+        float h;
     };
 
     // -- Vector Math Helpers --
@@ -288,6 +295,8 @@ namespace vuron
         // --- Geometry Data ---
         ShapeType type = ShapeType::CUBE; // Default to a cube
         Vector3 normal = {0.0f, 1.0f, 0.0f}; // Only used if it's a wedge
+
+        std::string textureName = "";
 
         // Will only be populated if type == CUSTOM
         std::vector<vuron::Vertex> customTriangles;

@@ -229,6 +229,7 @@ namespace vuron {
 
         // Lock it into the map so it's possible to look it up by name later
         m_textureCache[textureName] = metalTexture;
+        m_textureDims[textureName] = {(float)width, (float)height};
         printf("Successfully loaded texture: %s (%dx%d) into VRAM\n", textureName.c_str(), width, height);
     }
 
@@ -298,20 +299,26 @@ namespace vuron {
         return false;
       }
 
-      // --- Dynamic Asset path resolution ---
-      // Demo mode check
-      // texpath = Texture Path
-      NSString* texPath = [baseDir stringByAppendingPathComponent:@"src/assets/textures/test_brick2.png"];
+      // --- Dynamic Auto loader -------------
+      NSString* texDir = [baseDir stringByAppendingPathComponent:@"src/assets/textures"];
 
       // Dev mode fallback
-      if (![[NSFileManager defaultManager] fileExistsAtPath:texPath])
+      if (![[NSFileManager defaultManager] fileExistsAtPath:texDir])
       {
-        texPath = [baseDir stringByAppendingPathComponent:@"../src/assets/textures/test_brick2.png"];
-        texPath = [texPath stringByStandardizingPath];
+        texDir = [[baseDir stringByAppendingPathComponent:@"../src/assets/textures"] stringByStandardizingPath];
       }
 
-      // Pass the dynamically resolved path to the loader
-      loadTexture([texPath UTF8String], "test_brick");
+      NSArray* files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:texDir error:nil];
+      for (NSString* file in files)
+      {
+        if ([[file lowercaseString] hasSuffix:@".png"] || [[file lowercaseString] hasSuffix:@".jpg"])
+        {
+            NSString* fullPath = [texDir stringByAppendingPathComponent:file];
+            // Strips the extension (so that the names match the ones in TrenchBroom)
+            NSString* name = [file stringByDeletingPathExtension];
+            loadTexture([fullPath UTF8String], [name UTF8String]);
+        }
+      }
       // -------------------------------------
 
       // Extract our specific functions by name
@@ -733,7 +740,7 @@ namespace vuron {
                 g_activeRespawnPoint = mapData.playerSpawn;
                 // ---------------------------------------------------
 
-                m_cubes = vuron::MapParser::generateShapes(mapData);
+                m_cubes = vuron::MapParser::generateShapes(mapData, m_textureDims);
 
                 // -- GPU Bake Pass: Compiling custom Geometry
                 id<MTLDevice> device = (id<MTLDevice>)m_device;
@@ -1314,7 +1321,7 @@ namespace vuron {
                                 if (pushNormal.y > 0.7f)
                                 {
                                     camera.isGrounded = true; camera.crouchedMidAir = false; camera.currentAirGrapples = camera.maxAirGrapples;
-                                    vel.x *= 0.5f; vel.z *=0.5f; stepVel.x *= 0.5f; stepVel.z *= 0.5f;
+                                    camera.velocity.x *= 0.5f; camera.velocity.z *= 0.5f;
                                 }
                             }
                         }
@@ -1646,6 +1653,9 @@ namespace vuron {
             {
                 // Binding the specific object's unique geometry buffer
                 [encoder setVertexBuffer:(id<MTLBuffer>)m_cubes[i].customVertexBuffer offset:0 atIndex:0];
+
+                // Swap the texture dynamically based on the object's memory
+                [encoder setFragmentTexture:m_textureCache[m_cubes[i].textureName] atIndex:0];
 
                 // Custom objects don't use the index map, they just draw raw triangles straight through
                 [encoder drawPrimitives:MTLPrimitiveTypeTriangle

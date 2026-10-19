@@ -149,6 +149,7 @@ namespace vuron
         // --- Texture Pipeline ---
         std::unordered_map<std::string, id<MTLTexture>> m_textureCache;
         void loadTexture(const std::string& filepath, const std::string& textureName);
+        std::unordered_map<std::string, vuron::TextureDims> m_textureDims;
 
     };
 }
