@@ -184,6 +184,9 @@ namespace vuron
 
             static void triangulateBrush(const MapBrush& brush, const std::vector<vuron::Vector3>& vertices, vuron::Transform& outShape, const std::unordered_map<std::string, vuron::TextureDims>& texDict)
             {
+                //Temporary bucket to group triangles by texture name
+                std::unordered_map<std::string, std::vector<vuron::Vertex>> textureGroups;
+
                 for (const auto& plane : brush.planes)
                 {
                     std::vector<vuron::Vector3> faceVerts;
@@ -288,12 +291,22 @@ namespace vuron
 
                         for (size_t i = 1; i < faceVerts.size() - 1; ++i)
                         {
-                            outShape.customTriangles.push_back(makeVertex(faceVerts[0]));
-                            outShape.customTriangles.push_back(makeVertex(faceVerts[i]));
-                            outShape.customTriangles.push_back(makeVertex(faceVerts[i+1]));
+                            textureGroups[plane.texData.name].push_back(makeVertex(faceVerts[0]));
+                            textureGroups[plane.texData.name].push_back(makeVertex(faceVerts[i]));
+                            textureGroups[plane.texData.name].push_back(makeVertex(faceVerts[i+1]));
 
                         }
                     }
+                }
+
+                // Bake the sorted groups into the final shape
+                for (auto& pair: textureGroups)
+                {
+                    vuron::SubMesh sm;
+                    sm.textureName = pair.first;
+                    sm.vertices = pair.second; // The fully UV mapped vertices
+                    sm.vertexCount = (int)pair.second.size();
+                    outShape.subMeshes.push_back(sm);
                 }
             }
 
@@ -357,7 +370,6 @@ namespace vuron
                      // -= Strict Shape Routing =-
                      // Treat all Trenchbroom brushes as CUSTOM geometry to get their UVs mapped
                      shape.type = vuron::ShapeType::CUSTOM;
-                     shape.textureName = brush.planes[0].texData.name;
                      triangulateBrush(brush, vertices, shape, texDict);
 
                      // Save all TrenchBroom planes directly to the physics engine

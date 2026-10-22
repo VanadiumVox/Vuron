@@ -285,6 +285,14 @@ namespace vuron
     // Weapon State
     enum class Weapon { GRAPPLE, ROCKET };
 
+    struct SubMesh
+    {
+        std::string textureName;
+        std::vector<Vertex> vertices; // Holds the CPU-side data
+        void* vertexBuffer = nullptr; // Holds the Apple Metal GPU Handle
+        int vertexCount = 0;
+    };
+
     // A 3D transform that holds position, rotation and scale for any entity
     struct Transform
     {
@@ -296,14 +304,8 @@ namespace vuron
         ShapeType type = ShapeType::CUBE; // Default to a cube
         Vector3 normal = {0.0f, 1.0f, 0.0f}; // Only used if it's a wedge
 
-        std::string textureName = "";
-
-        // Will only be populated if type == CUSTOM
-        std::vector<vuron::Vertex> customTriangles;
-
-        // GPU Memory Handles for Custom geometry
-        void* customVertexBuffer = nullptr;
-        int customVertexCount = 0;
+        // The Pure Path replacement for "custom" shapes
+        std::vector<SubMesh> subMeshes;
 
         // The definition of a flat surface
         struct Plane

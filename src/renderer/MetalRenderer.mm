@@ -746,29 +746,32 @@ namespace vuron {
                 id<MTLDevice> device = (id<MTLDevice>)m_device;
                 for (size_t i = 0; i < m_cubes.size(); ++i)
                 {
-                    if (m_cubes[i].type == vuron::ShapeType::CUSTOM && !m_cubes[i].customTriangles.empty())
+                    if (m_cubes[i].type == vuron::ShapeType::CUSTOM)
                     {
-                        std::vector<vuron::Vertex> gpuVertices;
-
-                        // Convert the World space points to Local space points by subtracting the center position
-                        for (const auto& pt : m_cubes[i].customTriangles)
+                        // Loop through every material on this specific brush
+                        for (auto& subMesh : m_cubes[i].subMeshes)
                         {
-                            vuron::Vector3 localPt =
+                            std::vector<vuron::Vertex> gpuVertices;
+
+                            // Convert the World space points to Local space points by subtracting the center position
+                            for (const auto& pt : subMesh.vertices)
                             {
-                                pt.position.x - m_cubes[i].position.x,
-                                pt.position.y - m_cubes[i].position.y,
-                                pt.position.z - m_cubes[i].position.z
-                            };
+                                vuron::Vector3 localPt =
+                                {
+                                    pt.position.x - m_cubes[i].position.x,
+                                    pt.position.y - m_cubes[i].position.y,
+                                    pt.position.z - m_cubes[i].position.z
+                                };
 
-                            // Giving custom shapes a distinct Orange color
-                            gpuVertices.push_back({localPt, pt.color, pt.u, pt.v});
+                                // Giving custom shapes a distinct Orange color
+                                gpuVertices.push_back({localPt, pt.color, pt.u, pt.v});
+                            }
+
+                            // Allocating a dedicated Metal Buffer just for this specific texture chunk
+                            subMesh.vertexBuffer = (void*)[device newBufferWithBytes:gpuVertices.data()
+                                                                        length:(sizeof(vuron::Vertex) * gpuVertices.size())
+                                                                        options:MTLResourceStorageModeShared];
                         }
-                        m_cubes[i].customVertexCount = (int)gpuVertices.size();
-
-                        // Allocating a dedicated Metal Buffer just for the weird shapes
-                        m_cubes[i].customVertexBuffer = (void*)[device newBufferWithBytes:gpuVertices.data()
-                                                                    length:(sizeof(vuron::Vertex) * gpuVertices.size())
-                                                                    options:MTLResourceStorageModeShared];
                     }
                 }
             }
@@ -1562,16 +1565,17 @@ namespace vuron {
                 }
                 else if (m_cubes[i].type == vuron::ShapeType::CUSTOM)
                 {
-                    // For custom geometry, find exactly which plane the ray struck.
-                    for (const auto& plane : m_cubes[i].customPlanes)
+                    // Draw every piece of the object with its correct texture
+                    for (const auto& subMesh : m_cubes[i].subMeshes)
                     {
-                        vuron::Vector3 hitPt = { downRay.origin.x, downRay.origin.y - hitDist, downRay.origin.z };
-                        float d = vuron::dot(hitPt, plane.normal) - plane.distance;
-
-                        if (std::abs(d) < 0.01f)
+                        if (subMesh.vertexBuffer)
                         {
-                            shadowNormal = plane.normal;
-                            break;
+                            [encoder setVertexBuffer:(id<MTLBuffer>)subMesh.vertexBuffer offset:0 atIndex:0];
+                            [encoder setFragmentTexture:m_textureCache[subMesh.textureName] atIndex:0];
+
+                            [encoder drawPrimitives:MTLPrimitiveTypeTriangle
+                                        vertexStart:0
+                                        vertexCount:subMesh.vertexCount];
                         }
                     }
                 }
@@ -1649,18 +1653,21 @@ namespace vuron {
                                 indexBuffer:(id<MTLBuffer>)m_indexBuffer
                                 indexBufferOffset:72];
             }
-            else if (m_cubes[i].type == vuron::ShapeType::CUSTOM && m_cubes[i].customVertexBuffer)
+            else if (m_cubes[i].type == vuron::ShapeType::CUSTOM)
             {
-                // Binding the specific object's unique geometry buffer
-                [encoder setVertexBuffer:(id<MTLBuffer>)m_cubes[i].customVertexBuffer offset:0 atIndex:0];
+                // Draw every piece of the object with its correct texture
+                for (const auto& subMesh : m_cubes[i].subMeshes)
+                {
+                    if (subMesh.vertexBuffer)
+                    {
+                        [encoder setVertexBuffer:(id<MTLBuffer>)subMesh.vertexBuffer offset:0 atIndex:0];
+                        [encoder setFragmentTexture:m_textureCache[subMesh.textureName] atIndex:0];
 
-                // Swap the texture dynamically based on the object's memory
-                [encoder setFragmentTexture:m_textureCache[m_cubes[i].textureName] atIndex:0];
-
-                // Custom objects don't use the index map, they just draw raw triangles straight through
-                [encoder drawPrimitives:MTLPrimitiveTypeTriangle
-                        vertexStart:0
-                        vertexCount:m_cubes[i].customVertexCount];
+                        [encoder drawPrimitives:MTLPrimitiveTypeTriangle
+                                    vertexStart:0
+                                    vertexCount:subMesh.vertexCount];
+                    }
+                }
             }
         }
 
