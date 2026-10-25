@@ -1205,26 +1205,34 @@ namespace vuron {
                 // -- Flat Geometry Pass (X & Z) --
                 camera.position.x += stepVel.x;
                 vuron::AABB xBox = camera.getHitbox();
+                if (stepVel.x < 0.0f) xBox.min.x += stepVel.x;
+                else if (stepVel.x > 0.0f) xBox.max.x += stepVel.x;
                 xBox.min.y += 0.05f; xBox.max.y -= 0.05f;
                 for (int i : m_grid.query(xBox))
                 {
                     if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(xBox, m_cubes[i].getHitbox()))
                     {
-                        camera.position.x -= stepVel.x; stepVel.x = 0.0f; vel.x = 0.0f;
-                        m_isParryLaunching = false; // Cancel screen shaking
+                        camera.position.x -= stepVel.x;
+                        stepVel.x = 0.0f;
+                        vel.x = 0.0f;
+                        m_isParryLaunching = false;
                         break;
                     }
                 }
 
                 camera.position.z += stepVel.z;
                 vuron::AABB zBox = camera.getHitbox();
+                if (stepVel.z < 0.0f) zBox.min.z += stepVel.z;
+                else if (stepVel.z > 0.0f) zBox.max.z += stepVel.z;
                 zBox.min.y += 0.05f; zBox.max.y -= 0.05f;
                 for (int i : m_grid.query(zBox))
                 {
                     if (m_cubes[i].type == vuron::ShapeType::CUBE && vuron::AABB::checkCollision(zBox, m_cubes[i].getHitbox()))
                     {
-                        camera.position.z -= stepVel.z; stepVel.z = 0.0f; vel.z = 0.0f;
-                        m_isParryLaunching = false; // Cancel screen shake
+                        camera.position.z -= stepVel.z;
+                        stepVel.z = 0.0f;
+                        vel.z = 0.0f;
+                        m_isParryLaunching = false;
                         break;
                     }
                 }
@@ -1308,7 +1316,33 @@ namespace vuron {
 
                             if (colliding)
                             {
-                                m_isParryLaunching = false; // Cancel Screen shake
+                                //--- SAT Step Climbing ---
+                                bool canStep = false;
+
+                                // If the player hits a wall (horizontal normal) and is grounded
+                                if (camera.isGrounded && std::abs(pushNormal.y) < 0.2f)
+                                {
+                                    // Test a ghost hitbox 0.55 units higher
+                                    vuron::Vector3 ghostCenter = {center.x, center.y + 0.55f, center.z};
+                                    bool ghostColliding = true;
+
+                                    for (size_t p = 0; p < planes.size(); p++)
+                                    {
+                                        float r = ext.x * std::abs(planes[p].normal.x) + ext.y * std::abs(planes[p].normal.y) + ext.z * std::abs(planes[p].normal.z);
+                                        float d = vuron::dot(ghostCenter, planes[p].normal) - planes[p].distance;
+                                        if (d > r) {ghostColliding = false; break;}
+                                    }
+
+                                    if (!ghostColliding) canStep = true;
+                                }
+
+                                if (canStep)
+                                {
+                                    camera.position.y += 0.55f;// Pop up over the step
+                                    continue; // Skip the pushback and keep the forward momentum
+                                }
+
+                                m_isParryLaunching = false;
                                 camera.position.x += pushNormal.x * minPenetration;
                                 camera.position.y += pushNormal.y * minPenetration;
                                 camera.position.z += pushNormal.z * minPenetration;
@@ -1539,43 +1573,75 @@ namespace vuron {
         vuron::Vector3 shadowNormal = {0.0f, 1.0f, 0.0f}; // Default flat floor
         bool drawShadow = false;
 
-        // Shoot a line straight down from the camera
         vuron::Ray downRay = { camera.position, {0.0f, -1.0f, 0.0f} };
         float closestFloorDist = 9999.0f;
 
         for (size_t i = 0; i < m_cubes.size(); ++i)
         {
-            float hitDist = downRay.intersectsOBB(m_cubes[i]);
-
-            // If the floor is directly below us, and it's the closest we've hit
-            if (hitDist > 0.0f && hitDist < closestFloorDist)
+            // Broad-phase: Only proceed if the ray at least hits the bounding box
+            if (downRay.intersectsOBB(m_cubes[i]) > 0.0f)
             {
-                closestFloorDist = hitDist;
-                // Calculate exact y coordinate of the floor
-                shadowY = camera.position.y - hitDist;
-
-                // Steal the exact normal of the surface so we can tilt the shadow
                 if (m_cubes[i].type == vuron::ShapeType::CUBE)
                 {
-                    shadowNormal = {0.0f, 1.0f, 0.0f};
-                }
-                else if (m_cubes[i].type == vuron::ShapeType::WEDGE)
-                {
-                    shadowNormal = m_cubes[i].normal;
+                    float hitDist = downRay.intersectsOBB(m_cubes[i]);
+                    if (hitDist > 0.0f && hitDist < closestFloorDist)
+                    {
+                        closestFloorDist = hitDist;
+                        shadowY = camera.position.y - hitDist;
+                        shadowNormal = {0.0f, 1.0f, 0.0f};
+                    }
                 }
                 else if (m_cubes[i].type == vuron::ShapeType::CUSTOM)
                 {
-                    // Draw every piece of the object with its correct texture
+                    // Pure Path Narrow-phase: 2D Barycentric Ray-Triangle check
                     for (const auto& subMesh : m_cubes[i].subMeshes)
                     {
-                        if (subMesh.vertexBuffer)
+                        for (size_t v = 0; v < subMesh.vertices.size(); v += 3)
                         {
-                            [encoder setVertexBuffer:(id<MTLBuffer>)subMesh.vertexBuffer offset:0 atIndex:0];
-                            [encoder setFragmentTexture:m_textureCache[subMesh.textureName] atIndex:0];
+                            vuron::Vector3 v0 = subMesh.vertices[v].position;
+                            vuron::Vector3 v1 = subMesh.vertices[v+1].position;
+                            vuron::Vector3 v2 = subMesh.vertices[v+2].position;
 
-                            [encoder drawPrimitives:MTLPrimitiveTypeTriangle
-                                        vertexStart:0
-                                        vertexCount:subMesh.vertexCount];
+                            // 1. Project triangle onto the XZ plane and check if camera is inside it
+                            float denom = ((v1.z - v2.z) * (v0.x - v2.x) + (v2.x - v1.x) * (v0.z - v2.z));
+                            if (std::abs(denom) < 0.0001f) continue; // Prevent divide by zero
+
+                            float a = ((v1.z - v2.z) * (camera.position.x - v2.x) + (v2.x - v1.x) * (camera.position.z - v2.z)) / denom;
+                            float b = ((v2.z - v0.z) * (camera.position.x - v2.x) + (v0.x - v2.x) * (camera.position.z - v2.z)) / denom;
+                            float c = 1.0f - a - b;
+
+                            // If a, b, and c are between 0 and 1, the ray is hitting this exact triangle
+                            if (a >= 0.0f && a <= 1.0f && b >= 0.0f && b <= 1.0f && c >= 0.0f && c <= 1.0f)
+                            {
+                                // 2. Interpolate the exact slanted Y height
+                                float hitY = a * v0.y + b * v1.y + c * v2.y;
+                                float hitDist = camera.position.y - hitY;
+
+                                if (hitDist > 0.0f && hitDist < closestFloorDist)
+                                {
+                                    closestFloorDist = hitDist;
+                                    shadowY = hitY;
+
+                                    // 3. Calculate exact normal using cross product of edges
+                                    vuron::Vector3 edge1 = {v1.x - v0.x, v1.y - v0.y, v1.z - v0.z};
+                                    vuron::Vector3 edge2 = {v2.x - v0.x, v2.y - v0.y, v2.z - v0.z};
+
+                                    vuron::Vector3 cross =
+                                    {
+                                        edge1.y * edge2.z - edge1.z * edge2.y,
+                                        edge1.z * edge2.x - edge1.x * edge2.z,
+                                        edge1.x * edge2.y - edge1.y * edge2.x
+                                    };
+
+                                    float length = std::sqrt(cross.x*cross.x + cross.y*cross.y + cross.z*cross.z);
+                                    if (length > 0.0001f)
+                                    {
+                                        // Ensures the normal always points up (flips if vertices are wound backward)
+                                        if (cross.y < 0.0f) { cross.x = -cross.x; cross.y = -cross.y; cross.z = -cross.z; }
+                                        shadowNormal = {cross.x/length, cross.y/length, cross.z/length};
+                                    }
+                                }
+                            }
                         }
                     }
                 }
