@@ -593,6 +593,10 @@ namespace vuron
         int maxAirGrapples = 2;
         int currentAirGrapples = 2;
 
+        // The Air-charge system for the Katana
+        int currentAirSwings = 0;
+        int maxAirSwings = 3;
+
         // Converts the camera's Pitch and Yaw into a normal vector
         Vector3 getForwardVector() const
         {

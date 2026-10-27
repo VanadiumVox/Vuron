@@ -121,6 +121,10 @@ namespace vuron
         vuron::Weapon m_currentWeapon = Weapon::GRAPPLE;
         int m_parryActiveFrames = 0;
 
+        // Katana stuff
+        bool m_katanaPressed = false;
+        bool m_katanaHeld = false;
+
         // Swap Timers
         bool m_keyG = false;
         int m_swapHoldTimer = 0;

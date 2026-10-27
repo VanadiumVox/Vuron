@@ -126,6 +126,12 @@ namespace vuron {
                 m_weaponJustSwapped = false;
             }
         }
+
+        // Katana Logic
+        if (key == 'e')
+        {
+            m_katanaPressed = isPressed;
+        }
     }
     // ---------------------------------------------------------
 
@@ -1357,7 +1363,10 @@ namespace vuron {
 
                                 if (pushNormal.y > 0.7f)
                                 {
-                                    camera.isGrounded = true; camera.crouchedMidAir = false; camera.currentAirGrapples = camera.maxAirGrapples;
+                                    camera.isGrounded = true;
+                                    camera.crouchedMidAir = false;
+                                    camera.currentAirGrapples = camera.maxAirGrapples;
+                                    camera.currentAirSwings = 0;
                                     camera.velocity.x *= 0.5f; camera.velocity.z *= 0.5f;
                                 }
                             }
@@ -1440,6 +1449,41 @@ namespace vuron {
                         m_hasJumped = true; // Lock further midair inputs
                     }
                 }
+            }
+
+            // Katana Blink Strike (Lunge Phase)
+            if (m_katanaPressed)
+            {
+                if (!m_katanaHeld) // Prevents holding the key to fly
+                {
+                    m_katanaHeld = true;
+
+                    if (camera.isGrounded || camera.currentAirSwings < camera.maxAirSwings)
+                    {
+                        // 1. Calculate pure horizontal direction directly from Yaw
+                        // Note: If this shoots you sideways or backwards, swap sin/cos or add a negative sign!
+                        float lookX = sin(camera.yaw);
+                        float lookZ = cos(camera.yaw);
+
+                        // 2. Calculate decaying force
+                        float baseLungeSpeed = 3.0f;
+                        float appliedForce = baseLungeSpeed;
+
+                        if (!camera.isGrounded) {
+                            appliedForce /= (camera.currentAirSwings + 1.0f);
+                            camera.currentAirSwings++;
+                        }
+
+                        // 3. Inject the Vector! (Zero out Y to act as an emergency mid-air brake)
+                        camera.velocity.y = 0.0f;
+                        camera.velocity.x = lookX * appliedForce;
+                        camera.velocity.z = lookZ * appliedForce;
+                    }
+                }
+            }
+            else
+            {
+                m_katanaHeld = false; // Reset the lock when 'E' is released
             }
         }
         // ================================================

@@ -143,6 +143,7 @@ namespace vuron
             if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', true); handled = true;}
             if ([chars isEqualToString:@"r"]) {m_renderer->setKeyState('r', true); handled = true;}
             if ([chars isEqualToString:@"g"]) {m_renderer->setKeyState('g', true); handled = true;}
+            if ([chars isEqualToString:@"e"]) {m_renderer->setKeyState('e', true); handled = true;}
 
             NSString *unmodifiedChars = [[event charactersIgnoringModifiers] lowercaseString];
             // Debug menu toggle (ctrl + v)
@@ -180,6 +181,7 @@ namespace vuron
             if ([chars isEqualToString:@" "]) {m_renderer->setKeyState(' ', false); handled = true;}
             if ([chars isEqualToString:@"r"]) {m_renderer->setKeyState('r', false); handled = true;}
             if ([chars isEqualToString:@"g"]) {m_renderer->setKeyState('g', false); handled = true;}
+            if ([chars isEqualToString:@"e"]) {m_renderer->setKeyState('e', false); handled = true;}
         }
 
         // Raw Left Mouse Up; detach grapple
