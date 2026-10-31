@@ -595,7 +595,9 @@ namespace vuron
 
         // The Air-charge system for the Katana
         int currentAirSwings = 0;
-        int maxAirSwings = 3;
+        int maxAirSwings = 1;
+        float lowestAirY = 0.0f; // Tracks the deepest point of the player's current jump/fall
+        float dashTimer = 0.0f;
 
         // Converts the camera's Pitch and Yaw into a normal vector
         Vector3 getForwardVector() const

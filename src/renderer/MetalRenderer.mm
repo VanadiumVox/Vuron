@@ -6,6 +6,7 @@
 #import <AppKit/AppKit.h>
 #include <iostream>
 #include <mach-o/dyld.h>
+#include <chrono>
 #include "../math/Math.h"
 #include "../world/LevelLoader.h"
 #include "../world/MapParser.h"
@@ -817,7 +818,16 @@ namespace vuron {
         {
             m_hitstopTimer--; // Tick down
         }
-        else {
+        else
+        {
+            // Calculate deltaTime natively in standard C++
+            static auto lastTime = std::chrono::high_resolution_clock::now();
+            auto currentTime = std::chrono::high_resolution_clock::now();
+            float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+            lastTime = currentTime;
+
+            // Safety clamp: If the player pauses the game or drags the window, don't let deltaTime explode
+            if (deltaTime > 0.1f) deltaTime = 0.016f;
 
             // --- The Grappling Hook logic (yeah, I know, it's weird up here too but makes sense) ---
             // Inputs are consumed instantly, no queues
@@ -1168,12 +1178,6 @@ namespace vuron {
                     totalVy += ny * retractSpeed;
                     totalVz += nz * retractSpeed;
 
-                    // Dampening swing more since holding space fuckin launches ya
-    //                 float maxSwingHeight = 0.22f;
-    //                 if (totalVy > maxSwingHeight)
-    //                 {
-    //                     totalVy = maxSwingHeight;
-    //                 }
                 }
 
                 // 4. Extract the orbital physics back out to separate it from WASD movement
@@ -1366,13 +1370,46 @@ namespace vuron {
                                     camera.isGrounded = true;
                                     camera.crouchedMidAir = false;
                                     camera.currentAirGrapples = camera.maxAirGrapples;
-                                    camera.currentAirSwings = 0;
                                     camera.velocity.x *= 0.5f; camera.velocity.z *= 0.5f;
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            // --- The Dash economy (Altimeter + timer) ---
+            // 1. The timer
+            if (camera.currentAirSwings > 0)
+            {
+                camera.dashTimer -= deltaTime; // Ticking down the timer
+
+                if (camera.dashTimer <= 0.0f)
+                {
+                    camera.currentAirSwings = 0;
+                    camera.dashTimer = 0;
+                    camera.lowestAirY = camera.position.y;
+                }
+            }
+
+            // 2. The airborne Altimeter
+            if (!camera.isGrounded)
+            {
+                if (camera.position.y < camera.lowestAirY)
+                {
+                    camera.lowestAirY = camera.position.y;
+                }
+                // Skill check: Did the player pass 50 units upwards?
+                if (camera.position.y >= camera.lowestAirY + 50.0f)
+                {
+                    camera.currentAirSwings = 0;
+                    camera.dashTimer = 0.0f; // Instantly clear the cooldown
+                    camera.lowestAirY = camera.position.y;
+                }
+            }
+            else
+            {
+                camera.lowestAirY = camera.position.y;
             }
 
             // =================================================
@@ -1451,7 +1488,7 @@ namespace vuron {
                 }
             }
 
-            // Katana Blink Strike (Lunge Phase)
+            // --- Katana Blink Strike (Variable Hold-to-Extend Lunge) ---
             if (m_katanaPressed)
             {
                 if (!m_katanaHeld) // Prevents holding the key to fly
@@ -1460,30 +1497,43 @@ namespace vuron {
 
                     if (camera.isGrounded || camera.currentAirSwings < camera.maxAirSwings)
                     {
-                        // 1. Calculate pure horizontal direction directly from Yaw
-                        // Note: If this shoots you sideways or backwards, swap sin/cos or add a negative sign!
                         float lookX = sin(camera.yaw);
                         float lookZ = cos(camera.yaw);
 
-                        // 2. Calculate decaying force
-                        float baseLungeSpeed = 3.0f;
-                        float appliedForce = baseLungeSpeed;
+                        float appliedForce = 5.0f;
 
-                        if (!camera.isGrounded) {
-                            appliedForce /= (camera.currentAirSwings + 1.0f);
-                            camera.currentAirSwings++;
-                        }
-
-                        // 3. Inject the Vector! (Zero out Y to act as an emergency mid-air brake)
                         camera.velocity.y = 0.0f;
                         camera.velocity.x = lookX * appliedForce;
                         camera.velocity.z = lookZ * appliedForce;
+
+                        if (!camera.isGrounded) camera.currentAirSwings++;
+                        camera.dashTimer = 5.0f; // 5 second clock started
+                        m_isLunging = true;
                     }
                 }
             }
             else
             {
-                m_katanaHeld = false; // Reset the lock when 'E' is released
+                m_katanaHeld = false;
+
+                // THE EMERGENCY BRAKE (Early Release)
+                if (m_isLunging)
+                {
+                    camera.velocity.x *= 0.15f;
+                    camera.velocity.z *= 0.15f;
+                    m_isLunging = false;
+                }
+            }
+
+            // Natural Lunge Expiration
+            if (m_isLunging)
+            {
+                float horizontalSpeed = std::sqrt(camera.velocity.x * camera.velocity.x + camera.velocity.z * camera.velocity.z);
+                // Changed this to 2.0f so it doesn't instantly cancel your 4.0f dash!
+                if (horizontalSpeed < 2.0f)
+                {
+                    m_isLunging = false;
+                }
             }
         }
         // ================================================
@@ -1578,7 +1628,7 @@ namespace vuron {
         [encoder setFragmentTexture:m_textureCache["test_brick"] atIndex:0];
 
         // =====================================================
-        // --- Dynamic Grapple Light Bridge ---
+        // --- 6. Dynamic Grapple Light Bridge ---
         // =====================================================
         // Array format: {x, y, z, radius}
         float grappleLightData[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -1611,7 +1661,7 @@ namespace vuron {
 
 
         // =============================================================
-        // --- Smarter Shadow Drop Cast Algorithm ---
+        // --- 7. Smarter Shadow Drop Cast Algorithm ---
         // =============================================================
         float shadowY = -9999.0f;
         vuron::Vector3 shadowNormal = {0.0f, 1.0f, 0.0f}; // Default flat floor
@@ -1702,7 +1752,7 @@ namespace vuron {
 
 
         // ========================================
-        // -- Frustum Culling Algorithm --
+        // -- 8. Frustum Culling Algorithm --
         // ========================================
         // Generate the view-projection matrix once, and extract the 6 vision planes
         vuron::Matrix4x4 viewProj = viewMatrix * projectionMatrix;
@@ -1782,7 +1832,7 @@ namespace vuron {
         }
 
         // ==============================================================
-        // 5.1 The Cone Parry
+        // 9. The Cone Parry
         // ==============================================================
         if (m_parryActiveFrames > 0)
         {
@@ -1848,7 +1898,7 @@ namespace vuron {
         }
 
         // ================================================
-        // 5.25 Draw Live Rockets
+        // 10. Draw Live Rockets
         // ================================================
         // Rebinding the master buffer
         [encoder setVertexBuffer:(id<MTLBuffer>)m_vertexBuffer offset:0 atIndex:0];
@@ -2002,7 +2052,7 @@ namespace vuron {
         }
 
         // ===========================================
-        // 5.5 Draw Bounding box Wireframe
+        // 11. Draw Bounding box Wireframe
         // ===========================================
         if (m_showBoundingBoxes)
         {
@@ -2119,7 +2169,7 @@ namespace vuron {
         }
 
         // =======================================
-        // --- Draw the UI (Crosshair & Bars) ---
+        // --- 12. Draw the UI (Crosshair & Bars) ---
         // =======================================
 
         // 0.5. Necessary commands
@@ -2179,7 +2229,7 @@ namespace vuron {
         }
 
         // ===========================================
-        // -= 6. Debug Menu =-
+        // -= 13. Debug Menu =-
         // ===========================================
         static NSTextField* debugLabel = nil;
 
@@ -2198,6 +2248,7 @@ namespace vuron {
         int renderCount = renderedObjectCount;
         int totalCount = (int)m_cubes.size();
         int grappleCharges = camera.currentAirGrapples;
+        int airDashes = 1 - camera.currentAirSwings;
 
         // 2. Throw the UI drawing logic over to the main thread
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -2223,8 +2274,8 @@ namespace vuron {
                     [debugLabel setHidden:NO];
 
                     // BUild the core text block
-                    NSString *text = [NSString stringWithFormat:@"X: %.2f\nY: %.2f\nZ: %.2f\nSpeed: %.3f\nRendered: %d / %d\nGrapples: %d\nAccel: ",
-                                      px, py, pz, currentSpeed, renderCount, totalCount, grappleCharges];
+                    NSString *text = [NSString stringWithFormat:@"X: %.2f\nY: %.2f\nZ: %.2f\nSpeed: %.3f\nRendered: %d / %d\nGrapples: %d\nAir Dashes: %d\nAccel:",
+                                      px, py, pz, currentSpeed, renderCount, totalCount, grappleCharges, airDashes];
 
                     NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:text];
                     [attrStr addAttribute:NSForegroundColorAttributeName value:[NSColor whiteColor] range:NSMakeRange(0, text.length)];

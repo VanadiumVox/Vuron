@@ -124,6 +124,7 @@ namespace vuron
         // Katana stuff
         bool m_katanaPressed = false;
         bool m_katanaHeld = false;
+        bool m_isLunging = false;
 
         // Swap Timers
         bool m_keyG = false;
